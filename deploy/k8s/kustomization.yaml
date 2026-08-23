@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# Bakes config/routes.example.yaml into a ConfigMap named
+# semantic-router-config (with a content hash suffix, so the Deployment
+# above auto-rolls whenever the file changes). Point this at your own real
+# routes.yaml before deploying anywhere that isn't a demo.
+configMapGenerator:
+  - name: semantic-router-config
+    files:
+      - routes.yaml=../../config/routes.example.yaml
+
+images:
+  - name: semantic-router
+    newName: your-registry/semantic-router
+    newTag: latest

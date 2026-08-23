@@ -52,6 +52,8 @@ async fn main() -> Result<()> {
         cfg.cache.max_entries,
     );
 
+    let prompt_guard = semantic_router::prompt_guard::PromptGuard::new(&cfg.security.prompt_guard.extra_patterns);
+
     let state = Arc::new(server::AppState {
         embedder: Arc::new(embedder),
         router: Arc::new(semantic_router),
@@ -60,6 +62,8 @@ async fn main() -> Result<()> {
         default_backend_name: cfg.default.name.clone(),
         proxy: proxy::Proxy::new(),
         cache: Arc::new(cache),
+        security: cfg.security.clone(),
+        prompt_guard,
     });
 
     let addr = format!("{}:{}", cfg.server.host, cfg.server.port);

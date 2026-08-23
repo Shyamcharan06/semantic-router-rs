@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantic-router
+  labels:
+    app: semantic-router
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: semantic-router
+  template:
+    metadata:
+      labels:
+        app: semantic-router
+    spec:
+      containers:
+        - name: semantic-router
+          image: semantic-router
+          ports:
+            - containerPort: 8088
+          env:
+            - name: ROUTER_CONFIG
+              value: /app/config/routes.yaml
+            - name: RUST_LOG
+              value: info
+            # Redirect the Hugging Face Hub cache onto the emptyDir volume
+            # below so MiniLM weights survive across a rolling restart of
+            # the *same* pod instead of re-downloading; a real deployment
+            # would bake the weights into the image instead.
+            - name: HF_HUB_CACHE
+              value: /cache/huggingface
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: hf-cache
+              mountPath: /cache/huggingface
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8088
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8088
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: semantic-router-config
+        - name: hf-cache
+          emptyDir: {}

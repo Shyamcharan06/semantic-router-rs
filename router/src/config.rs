@@ -90,6 +90,47 @@ fn default_max_entries() -> usize {
     1000
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PiiAction {
+    Block,
+    Redact,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PiiConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_pii_action")]
+    pub action: PiiAction,
+}
+
+impl Default for PiiConfig {
+    fn default() -> Self {
+        Self { enabled: false, action: default_pii_action() }
+    }
+}
+
+fn default_pii_action() -> PiiAction {
+    PiiAction::Redact
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PromptGuardConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub extra_patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct SecurityConfig {
+    #[serde(default)]
+    pub pii: PiiConfig,
+    #[serde(default)]
+    pub prompt_guard: PromptGuardConfig,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Backend {
     pub base_url: String,
@@ -122,6 +163,8 @@ pub struct Config {
     pub default: DefaultRoute,
     #[serde(default)]
     pub cache: CacheConfig,
+    #[serde(default)]
+    pub security: SecurityConfig,
     pub categories: Vec<Category>,
 }
 

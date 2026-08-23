@@ -49,4 +49,32 @@ impl Proxy {
 
         Ok(payload)
     }
+
+    /// Forwards a `"stream": true` chat completion and returns the raw
+    /// backend response so its body can be piped straight through as
+    /// Server-Sent Events, without buffering the whole thing in memory.
+    pub async fn forward_chat_completion_stream(
+        &self,
+        target: &BackendTarget,
+        mut body: Value,
+    ) -> Result<reqwest::Response> {
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("model".to_string(), Value::String(target.model.clone()));
+        }
+
+        let url = format!("{}/v1/chat/completions", target.base_url.trim_end_matches('/'));
+        let mut req = self.client.post(&url).json(&body);
+        if let Some(key) = &target.api_key {
+            req = req.bearer_auth(key);
+        }
+
+        let resp = req.send().await.map_err(|e| anyhow!("request to backend {url} failed: {e}"))?;
+        let status = resp.status();
+        if !status.is_success() {
+            let payload = resp.text().await.unwrap_or_default();
+            return Err(anyhow!("backend {url} returned {status}: {payload}"));
+        }
+
+        Ok(resp)
+    }
 }

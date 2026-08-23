@@ -9,7 +9,7 @@ services:
   router:
     build: .
     ports:
-      - "8080:8080"
+      - "8088:8088"
     environment:
       - ROUTER_CONFIG=/app/config/routes.yaml
       - HF_HUB_CACHE=/app/.cache/huggingface

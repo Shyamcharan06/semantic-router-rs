@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantic-router
+  labels:
+    app: semantic-router
+spec:
+  selector:
+    app: semantic-router
+  ports:
+    - port: 80
+      targetPort: 8088
+  type: ClusterIP

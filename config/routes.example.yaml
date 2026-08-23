@@ -28,6 +28,19 @@ cache:
   ttl_seconds: 300
   max_entries: 1000
 
+security:
+  # Demo-grade heuristics (regex PII patterns, substring jailbreak phrases),
+  # not a production compliance/safety tool -- see README for caveats.
+  pii:
+    enabled: false
+    # "redact": strip PII from the message before routing/forwarding it.
+    # "block": reject the request outright with a 400.
+    action: redact
+  prompt_guard:
+    enabled: false
+    # Extra phrases to block, on top of the built-in jailbreak phrase list.
+    extra_patterns: []
+
 default:
   name: default
   base_url: http://localhost:9000
