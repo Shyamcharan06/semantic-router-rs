@@ -33,7 +33,8 @@ fn detectors() -> &'static Vec<Detector> {
             },
             Detector {
                 kind: "phone",
-                regex: Regex::new(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b").unwrap(),
+                regex: Regex::new(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
+                    .unwrap(),
             },
             Detector {
                 kind: "ip_address",
@@ -47,7 +48,12 @@ fn detectors() -> &'static Vec<Detector> {
 pub fn scan(text: &str) -> Vec<PiiFinding> {
     detectors()
         .iter()
-        .flat_map(|d| d.regex.find_iter(text).map(move |m| PiiFinding { kind: d.kind, matched: m.as_str().to_string() }))
+        .flat_map(|d| {
+            d.regex.find_iter(text).map(move |m| PiiFinding {
+                kind: d.kind,
+                matched: m.as_str().to_string(),
+            })
+        })
         .collect()
 }
 
@@ -58,12 +64,22 @@ pub fn redact(text: &str) -> (String, Vec<PiiFinding>) {
     let mut result = text.to_string();
 
     for d in detectors() {
-        let matches: Vec<String> = d.regex.find_iter(&result).map(|m| m.as_str().to_string()).collect();
+        let matches: Vec<String> = d
+            .regex
+            .find_iter(&result)
+            .map(|m| m.as_str().to_string())
+            .collect();
         for m in matches {
-            findings.push(PiiFinding { kind: d.kind, matched: m });
+            findings.push(PiiFinding {
+                kind: d.kind,
+                matched: m,
+            });
         }
         let placeholder = format!("[REDACTED_{}]", d.kind.to_uppercase());
-        result = d.regex.replace_all(&result, placeholder.as_str()).into_owned();
+        result = d
+            .regex
+            .replace_all(&result, placeholder.as_str())
+            .into_owned();
     }
 
     (result, findings)
@@ -76,13 +92,21 @@ mod tests {
     #[test]
     fn detects_email() {
         let findings = scan("reach me at jane.doe@example.com please");
-        assert!(findings.iter().any(|f| f.kind == "email" && f.matched == "jane.doe@example.com"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.kind == "email" && f.matched == "jane.doe@example.com")
+        );
     }
 
     #[test]
     fn detects_ssn() {
         let findings = scan("my ssn is 123-45-6789");
-        assert!(findings.iter().any(|f| f.kind == "ssn" && f.matched == "123-45-6789"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.kind == "ssn" && f.matched == "123-45-6789")
+        );
     }
 
     #[test]
@@ -107,7 +131,8 @@ mod tests {
 
     #[test]
     fn redact_handles_multiple_pii_kinds() {
-        let (redacted, findings) = redact("email jane@example.com or call 555-123-4567, ssn 123-45-6789");
+        let (redacted, findings) =
+            redact("email jane@example.com or call 555-123-4567, ssn 123-45-6789");
         assert!(redacted.contains("[REDACTED_EMAIL]"));
         assert!(redacted.contains("[REDACTED_SSN]"));
         assert!(findings.len() >= 2);

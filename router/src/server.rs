@@ -78,7 +78,9 @@ async fn route_debug(
         Some(name) => state.backends.get(name),
         None => None,
     };
-    let model = target.map(|t| t.model.clone()).unwrap_or_else(|| state.default_backend.model.clone());
+    let model = target
+        .map(|t| t.model.clone())
+        .unwrap_or_else(|| state.default_backend.model.clone());
 
     Ok(Json(serde_json::json!({
         "query": params.q,
@@ -100,13 +102,21 @@ async fn embed_debug(
     Ok(Json(serde_json::json!({ "embedding": embedding })))
 }
 
-async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Json<Value>) -> Result<Response, AppError> {
-    let mut query_text = extract_last_user_message(&body)
-        .ok_or_else(|| anyhow::anyhow!("request must include a message with role 'user' and string content"))?;
+async fn chat_completions(
+    State(state): State<Arc<AppState>>,
+    Json(mut body): Json<Value>,
+) -> Result<Response, AppError> {
+    let mut query_text = extract_last_user_message(&body).ok_or_else(|| {
+        anyhow::anyhow!("request must include a message with role 'user' and string content")
+    })?;
 
     if state.security.prompt_guard.enabled {
-        let matched = tracing::info_span!("prompt_guard")
-            .in_scope(|| state.prompt_guard.matched_pattern(&query_text).map(str::to_string));
+        let matched = tracing::info_span!("prompt_guard").in_scope(|| {
+            state
+                .prompt_guard
+                .matched_pattern(&query_text)
+                .map(str::to_string)
+        });
         if let Some(pattern) = matched {
             return Ok(security_block_response(
                 StatusCode::FORBIDDEN,
@@ -129,7 +139,8 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
                     ));
                 }
                 PiiAction::Redact => {
-                    let (redacted_text, _found) = tracing::info_span!("pii_redact").in_scope(|| pii::redact(&query_text));
+                    let (redacted_text, _found) =
+                        tracing::info_span!("pii_redact").in_scope(|| pii::redact(&query_text));
                     set_last_user_message(&mut body, &redacted_text);
                     query_text = redacted_text;
                 }
@@ -141,9 +152,16 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
     let is_streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
 
     if !is_streaming {
-        let cache_hit = state.cache.get(&embedding).instrument(tracing::info_span!("cache_lookup")).await;
+        let cache_hit = state
+            .cache
+            .get(&embedding)
+            .instrument(tracing::info_span!("cache_lookup"))
+            .await;
         if let Some(hit) = cache_hit {
-            let category_label = hit.category.clone().unwrap_or_else(|| state.default_backend_name.clone());
+            let category_label = hit
+                .category
+                .clone()
+                .unwrap_or_else(|| state.default_backend_name.clone());
             let headers = routing_headers(&category_label, hit.score, "hit");
             return Ok((headers, Json(hit.response)).into_response());
         }
@@ -151,10 +169,17 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
 
     let decision = tracing::info_span!("route").in_scope(|| state.router.route(&embedding));
     let target = match &decision.category {
-        Some(name) => state.backends.get(name).cloned().unwrap_or_else(|| state.default_backend.clone()),
+        Some(name) => state
+            .backends
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| state.default_backend.clone()),
         None => state.default_backend.clone(),
     };
-    let category_label = decision.category.clone().unwrap_or_else(|| state.default_backend_name.clone());
+    let category_label = decision
+        .category
+        .clone()
+        .unwrap_or_else(|| state.default_backend_name.clone());
 
     if is_streaming {
         let upstream = state
@@ -179,7 +204,12 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
             .header("content-type", content_type)
             .body(Body::from_stream(byte_stream))
             .map_err(|e| anyhow::anyhow!("failed to build streaming response: {e}"))?;
-        apply_routing_headers(response.headers_mut(), &category_label, decision.score, "bypassed");
+        apply_routing_headers(
+            response.headers_mut(),
+            &category_label,
+            decision.score,
+            "bypassed",
+        );
         return Ok(response);
     }
 
@@ -188,7 +218,11 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
         .forward_chat_completion(&target, body)
         .instrument(tracing::info_span!("proxy_backend_call", backend = %target.base_url, model = %target.model, streaming = false))
         .await?;
-    state.cache.put(embedding, response.clone(), decision.category.clone()).instrument(tracing::info_span!("cache_put")).await;
+    state
+        .cache
+        .put(embedding, response.clone(), decision.category.clone())
+        .instrument(tracing::info_span!("cache_put"))
+        .await;
 
     let headers = routing_headers(&category_label, decision.score, "miss");
     Ok((headers, Json(response)).into_response())
@@ -234,11 +268,11 @@ fn set_last_user_message(body: &mut Value, new_text: &str) -> bool {
         return false;
     };
     for message in messages.iter_mut().rev() {
-        if message.get("role").and_then(|r| r.as_str()) == Some("user") {
-            if let Some(content) = message.get_mut("content") {
-                *content = Value::String(new_text.to_string());
-                return true;
-            }
+        if message.get("role").and_then(|r| r.as_str()) == Some("user")
+            && let Some(content) = message.get_mut("content")
+        {
+            *content = Value::String(new_text.to_string());
+            return true;
         }
     }
     false
@@ -259,7 +293,10 @@ mod tests {
                 {"role": "user", "content": "second question"},
             ]
         });
-        assert_eq!(extract_last_user_message(&body).as_deref(), Some("second question"));
+        assert_eq!(
+            extract_last_user_message(&body).as_deref(),
+            Some("second question")
+        );
     }
 
     #[test]

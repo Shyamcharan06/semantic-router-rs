@@ -19,8 +19,8 @@ use semantic_router::embeddings::Embedder;
 use semantic_router::prompt_guard::PromptGuard;
 use semantic_router::proxy::{BackendTarget, Proxy};
 use semantic_router::routing::{CategoryIndex, RoutingStrategy, SemanticRouter};
-use semantic_router::server::{build_router, AppState};
-use serde_json::{json, Value};
+use semantic_router::server::{AppState, build_router};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -38,7 +38,9 @@ async fn shared_embedder() -> Arc<Embedder> {
             Arc::new(
                 Embedder::load("sentence-transformers/all-MiniLM-L6-v2", "main")
                     .await
-                    .expect("failed to load embedding model - requires network access on first run"),
+                    .expect(
+                        "failed to load embedding model - requires network access on first run",
+                    ),
             )
         })
         .await
@@ -49,7 +51,11 @@ async fn shared_embedder() -> Arc<Embedder> {
 /// received (so tests can verify PII redaction reached the backend), or --
 /// for `"stream": true` requests -- a small canned SSE body.
 async fn echo_or_stream(Json(body): Json<Value>) -> Response {
-    let model = body.get("model").and_then(|m| m.as_str()).unwrap_or("unknown").to_string();
+    let model = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("unknown")
+        .to_string();
     let message = body
         .get("messages")
         .and_then(|m| m.as_array())
@@ -60,7 +66,9 @@ async fn echo_or_stream(Json(body): Json<Value>) -> Response {
         .to_string();
 
     if body.get("stream").and_then(Value::as_bool).unwrap_or(false) {
-        let sse = format!("data: {{\"model\":\"{model}\",\"delta\":\"hello from stream\"}}\n\ndata: [DONE]\n\n");
+        let sse = format!(
+            "data: {{\"model\":\"{model}\",\"delta\":\"hello from stream\"}}\n\ndata: [DONE]\n\n"
+        );
         return Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "text/event-stream")
@@ -90,25 +98,37 @@ async fn spawn_router_server(backend_addr: SocketAddr, security: SecurityConfig)
     let embedder = shared_embedder().await;
 
     let categories = [
-        ("coding", vec![
-            "Write a Python function to reverse a linked list",
-            "Why is my Rust borrow checker complaining about this code?",
-            "Debug this JavaScript async function",
-            "Explain the time complexity of quicksort",
-        ]),
-        ("creative_writing", vec![
-            "Write a short story about a lighthouse keeper",
-            "Compose a poem about autumn leaves",
-            "Give me a plot twist for a mystery novel",
-            "Write dialogue between two old friends",
-        ]),
+        (
+            "coding",
+            vec![
+                "Write a Python function to reverse a linked list",
+                "Why is my Rust borrow checker complaining about this code?",
+                "Debug this JavaScript async function",
+                "Explain the time complexity of quicksort",
+            ],
+        ),
+        (
+            "creative_writing",
+            vec![
+                "Write a short story about a lighthouse keeper",
+                "Compose a poem about autumn leaves",
+                "Give me a plot twist for a mystery novel",
+                "Write dialogue between two old friends",
+            ],
+        ),
     ];
 
     let mut category_indexes = Vec::new();
     let mut backends = HashMap::new();
     for (name, examples) in categories {
-        let embeddings = examples.iter().map(|e| embedder.embed(e).unwrap()).collect();
-        category_indexes.push(CategoryIndex { name: name.to_string(), embeddings });
+        let embeddings = examples
+            .iter()
+            .map(|e| embedder.embed(e).unwrap())
+            .collect();
+        category_indexes.push(CategoryIndex {
+            name: name.to_string(),
+            embeddings,
+        });
         backends.insert(
             name.to_string(),
             BackendTarget {
@@ -166,7 +186,10 @@ async fn routes_coding_and_creative_prompts_to_the_right_backend() {
         .await
         .unwrap();
 
-    assert_eq!(coding_resp.headers().get("x-router-category").unwrap(), "coding");
+    assert_eq!(
+        coding_resp.headers().get("x-router-category").unwrap(),
+        "coding"
+    );
     let coding_body: Value = coding_resp.json().await.unwrap();
     assert_eq!(coding_body["echo_model"], "coding-model");
 
@@ -180,7 +203,10 @@ async fn routes_coding_and_creative_prompts_to_the_right_backend() {
         .await
         .unwrap();
 
-    assert_eq!(creative_resp.headers().get("x-router-category").unwrap(), "creative_writing");
+    assert_eq!(
+        creative_resp.headers().get("x-router-category").unwrap(),
+        "creative_writing"
+    );
     let creative_body: Value = creative_resp.json().await.unwrap();
     assert_eq!(creative_body["echo_model"], "creative_writing-model");
 }
@@ -206,7 +232,13 @@ async fn route_debug_endpoint_returns_decision_without_calling_backend() {
 #[tokio::test]
 async fn prompt_guard_blocks_known_jailbreak_phrase() {
     let backend_addr = spawn_mock_backend().await;
-    let security = SecurityConfig { prompt_guard: PromptGuardConfig { enabled: true, extra_patterns: vec![] }, ..Default::default() };
+    let security = SecurityConfig {
+        prompt_guard: PromptGuardConfig {
+            enabled: true,
+            extra_patterns: vec![],
+        },
+        ..Default::default()
+    };
     let router_addr = spawn_router_server(backend_addr, security).await;
     let client = reqwest::Client::new();
 
@@ -227,7 +259,13 @@ async fn prompt_guard_blocks_known_jailbreak_phrase() {
 #[tokio::test]
 async fn pii_block_mode_rejects_request_with_email() {
     let backend_addr = spawn_mock_backend().await;
-    let security = SecurityConfig { pii: PiiConfig { enabled: true, action: PiiAction::Block }, ..Default::default() };
+    let security = SecurityConfig {
+        pii: PiiConfig {
+            enabled: true,
+            action: PiiAction::Block,
+        },
+        ..Default::default()
+    };
     let router_addr = spawn_router_server(backend_addr, security).await;
     let client = reqwest::Client::new();
 
@@ -248,7 +286,13 @@ async fn pii_block_mode_rejects_request_with_email() {
 #[tokio::test]
 async fn pii_redact_mode_forwards_scrubbed_message_to_backend() {
     let backend_addr = spawn_mock_backend().await;
-    let security = SecurityConfig { pii: PiiConfig { enabled: true, action: PiiAction::Redact }, ..Default::default() };
+    let security = SecurityConfig {
+        pii: PiiConfig {
+            enabled: true,
+            action: PiiAction::Redact,
+        },
+        ..Default::default()
+    };
     let router_addr = spawn_router_server(backend_addr, security).await;
     let client = reqwest::Client::new();
 
@@ -265,7 +309,10 @@ async fn pii_redact_mode_forwards_scrubbed_message_to_backend() {
     let body: Value = resp.json().await.unwrap();
     let received = body["received_message"].as_str().unwrap();
     assert!(received.contains("[REDACTED_EMAIL]"), "got: {received}");
-    assert!(!received.contains("jane.doe@example.com"), "got: {received}");
+    assert!(
+        !received.contains("jane.doe@example.com"),
+        "got: {received}"
+    );
 }
 
 #[tokio::test]
@@ -285,7 +332,10 @@ async fn streaming_request_pipes_backend_sse_through_unbuffered() {
         .unwrap();
 
     assert_eq!(resp.headers().get("x-router-category").unwrap(), "coding");
-    assert_eq!(resp.headers().get("content-type").unwrap(), "text/event-stream");
+    assert_eq!(
+        resp.headers().get("content-type").unwrap(),
+        "text/event-stream"
+    );
 
     let text = resp.text().await.unwrap();
     assert!(text.contains("coding-model"), "got: {text}");
@@ -298,9 +348,12 @@ async fn streaming_request_pipes_backend_sse_through_unbuffered() {
 /// classifier.json is stale or broken.
 #[tokio::test]
 async fn trained_classifier_routes_correctly_using_real_shipped_weights() {
-    let classifier_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config/classifier.json");
+    let classifier_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config/classifier.json");
     if !classifier_path.exists() {
-        eprintln!("skipping: {classifier_path:?} not present -- run eval/train_classifier.py to generate it");
+        eprintln!(
+            "skipping: {classifier_path:?} not present -- run eval/train_classifier.py to generate it"
+        );
         return;
     }
 
@@ -309,18 +362,34 @@ async fn trained_classifier_routes_correctly_using_real_shipped_weights() {
     let embedder = shared_embedder().await;
 
     let mut backends = HashMap::new();
-    for name in ["business_legal", "coding", "creative_writing", "general_chat", "math_reasoning"] {
+    for name in [
+        "business_legal",
+        "coding",
+        "creative_writing",
+        "general_chat",
+        "math_reasoning",
+    ] {
         backends.insert(
             name.to_string(),
-            BackendTarget { base_url: format!("http://{backend_addr}"), api_key: None, model: format!("{name}-model") },
+            BackendTarget {
+                base_url: format!("http://{backend_addr}"),
+                api_key: None,
+                model: format!("{name}-model"),
+            },
         );
     }
-    let default_backend =
-        BackendTarget { base_url: format!("http://{backend_addr}"), api_key: None, model: "general-model".to_string() };
+    let default_backend = BackendTarget {
+        base_url: format!("http://{backend_addr}"),
+        api_key: None,
+        model: "general-model".to_string(),
+    };
 
     let state = Arc::new(AppState {
         embedder,
-        router: Arc::new(RoutingStrategy::Classifier { classifier, confidence_threshold: 0.0 }),
+        router: Arc::new(RoutingStrategy::Classifier {
+            classifier,
+            confidence_threshold: 0.0,
+        }),
         backends,
         default_backend,
         default_backend_name: "default".to_string(),

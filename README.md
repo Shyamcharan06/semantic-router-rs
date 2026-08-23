@@ -275,9 +275,13 @@ request parsing, PII regexes, prompt-guard matching, classifier math) plus
 7 integration tests that spin up a real Candle/MiniLM embedder and a mock
 backend and assert, end-to-end over real HTTP: correct category routing
 under *both* routing strategies (including against the actual committed
-`classifier.json`, so a stale/broken weights file fails CI-style), prompt-
-guard blocking, PII block mode, PII redact mode (verifying the *backend*
-actually received the scrubbed text), and SSE streaming passthrough.
+`classifier.json`, so a stale/broken weights file fails CI), prompt-guard
+blocking, PII block mode, PII redact mode (verifying the *backend* actually
+received the scrubbed text), and SSE streaming passthrough.
+
+`.github/workflows/ci.yml` runs `cargo fmt --check`, `cargo clippy --all-targets
+-- -D warnings`, and the full test suite above on every push/PR (plus a
+syntax check over the eval scripts).
 
 ## Deploying to Kubernetes
 

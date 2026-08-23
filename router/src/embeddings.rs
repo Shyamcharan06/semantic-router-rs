@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig, DTYPE};
@@ -14,9 +14,9 @@ pub struct Embedder {
 
 impl Embedder {
     pub async fn load(model_id: &str, revision: &str) -> Result<Self> {
-        let (owner, name) = model_id
-            .split_once('/')
-            .ok_or_else(|| anyhow!("embedding.model_id must be in 'owner/name' form, got '{model_id}'"))?;
+        let (owner, name) = model_id.split_once('/').ok_or_else(|| {
+            anyhow!("embedding.model_id must be in 'owner/name' form, got '{model_id}'")
+        })?;
 
         let client = hf_hub::HFClient::new().context("failed to create Hugging Face Hub client")?;
         let repo = client.model(owner, name);
@@ -39,30 +39,39 @@ impl Embedder {
             .revision(revision)
             .send()
             .await
-            .with_context(|| format!("failed to download tokenizer.json for {model_id}@{revision}"))?;
+            .with_context(|| {
+                format!("failed to download tokenizer.json for {model_id}@{revision}")
+            })?;
         let weights_path = repo
             .download_file()
             .filename("model.safetensors")
             .revision(revision)
             .send()
             .await
-            .with_context(|| format!("failed to download model.safetensors for {model_id}@{revision}"))?;
+            .with_context(|| {
+                format!("failed to download model.safetensors for {model_id}@{revision}")
+            })?;
 
         let config_str = std::fs::read_to_string(&config_path)
             .with_context(|| format!("failed to read {config_path:?}"))?;
-        let config: BertConfig = serde_json::from_str(&config_str).context("failed to parse BERT config.json")?;
+        let config: BertConfig =
+            serde_json::from_str(&config_str).context("failed to parse BERT config.json")?;
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| anyhow!("failed to load tokenizer from {tokenizer_path:?}: {e}"))?;
 
         let device = Device::Cpu;
         let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[weights_path.clone()], DTYPE, &device)
+            VarBuilder::from_mmaped_safetensors(std::slice::from_ref(&weights_path), DTYPE, &device)
                 .with_context(|| format!("failed to load model weights from {weights_path:?}"))?
         };
         let model = BertModel::load(vb, &config).context("failed to construct BertModel")?;
 
-        Ok(Self { model, tokenizer, device })
+        Ok(Self {
+            model,
+            tokenizer,
+            device,
+        })
     }
 
     /// Embeds a single piece of text into a mean-pooled, L2-normalized vector.

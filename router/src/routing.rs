@@ -13,19 +13,31 @@ pub struct CategoryIndex {
 /// via `routing.strategy` in `routes.yaml`.
 pub enum RoutingStrategy {
     Similarity(SemanticRouter),
-    Classifier { classifier: Classifier, confidence_threshold: f32 },
+    Classifier {
+        classifier: Classifier,
+        confidence_threshold: f32,
+    },
 }
 
 impl RoutingStrategy {
     pub fn route(&self, query_embedding: &[f32]) -> RouteDecision {
         match self {
             RoutingStrategy::Similarity(router) => router.route(query_embedding),
-            RoutingStrategy::Classifier { classifier, confidence_threshold } => {
+            RoutingStrategy::Classifier {
+                classifier,
+                confidence_threshold,
+            } => {
                 let (label, confidence) = classifier.predict(query_embedding);
                 if confidence >= *confidence_threshold {
-                    RouteDecision { category: Some(label), score: confidence }
+                    RouteDecision {
+                        category: Some(label),
+                        score: confidence,
+                    }
                 } else {
-                    RouteDecision { category: None, score: confidence }
+                    RouteDecision {
+                        category: None,
+                        score: confidence,
+                    }
                 }
             }
         }
@@ -49,7 +61,10 @@ pub struct SemanticRouter {
 
 impl SemanticRouter {
     pub fn new(categories: Vec<CategoryIndex>, confidence_threshold: f32) -> Self {
-        Self { categories, confidence_threshold }
+        Self {
+            categories,
+            confidence_threshold,
+        }
     }
 
     pub fn route(&self, query_embedding: &[f32]) -> RouteDecision {
@@ -62,17 +77,24 @@ impl SemanticRouter {
                 .map(|e| cosine_similarity(query_embedding, e))
                 .fold(f32::MIN, f32::max);
 
-            if best.map_or(true, |(_, best_score)| score > best_score) {
+            if best.is_none_or(|(_, best_score)| score > best_score) {
                 best = Some((cat.name.as_str(), score));
             }
         }
 
         match best {
-            Some((name, score)) if score >= self.confidence_threshold => {
-                RouteDecision { category: Some(name.to_string()), score }
-            }
-            Some((_, score)) => RouteDecision { category: None, score },
-            None => RouteDecision { category: None, score: 0.0 },
+            Some((name, score)) if score >= self.confidence_threshold => RouteDecision {
+                category: Some(name.to_string()),
+                score,
+            },
+            Some((_, score)) => RouteDecision {
+                category: None,
+                score,
+            },
+            None => RouteDecision {
+                category: None,
+                score: 0.0,
+            },
         }
     }
 }
@@ -122,8 +144,14 @@ mod tests {
 
     fn make_router(threshold: f32) -> SemanticRouter {
         let categories = vec![
-            CategoryIndex { name: "coding".into(), embeddings: vec![vec![1.0, 0.0, 0.0]] },
-            CategoryIndex { name: "math".into(), embeddings: vec![vec![0.0, 1.0, 0.0]] },
+            CategoryIndex {
+                name: "coding".into(),
+                embeddings: vec![vec![1.0, 0.0, 0.0]],
+            },
+            CategoryIndex {
+                name: "math".into(),
+                embeddings: vec![vec![0.0, 1.0, 0.0]],
+            },
         ];
         SemanticRouter::new(categories, threshold)
     }

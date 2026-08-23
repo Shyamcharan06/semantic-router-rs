@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -12,7 +12,10 @@ pub struct ServerConfig {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { host: default_host(), port: default_port() }
+        Self {
+            host: default_host(),
+            port: default_port(),
+        }
     }
 }
 
@@ -56,7 +59,11 @@ pub struct RoutingConfig {
 
 impl Default for RoutingConfig {
     fn default() -> Self {
-        Self { confidence_threshold: default_threshold(), strategy: RoutingStrategyKind::default(), classifier_path: default_classifier_path() }
+        Self {
+            confidence_threshold: default_threshold(),
+            strategy: RoutingStrategyKind::default(),
+            classifier_path: default_classifier_path(),
+        }
     }
 }
 
@@ -124,7 +131,10 @@ pub struct PiiConfig {
 
 impl Default for PiiConfig {
     fn default() -> Self {
-        Self { enabled: false, action: default_pii_action() }
+        Self {
+            enabled: false,
+            action: default_pii_action(),
+        }
     }
 }
 
@@ -195,7 +205,10 @@ impl Config {
         }
         for cat in &cfg.categories {
             if cat.examples.is_empty() {
-                bail!("category '{}' must have at least one example utterance", cat.name);
+                bail!(
+                    "category '{}' must have at least one example utterance",
+                    cat.name
+                );
             }
         }
         Ok(cfg)
