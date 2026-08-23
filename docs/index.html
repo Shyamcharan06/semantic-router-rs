@@ -1,0 +1,533 @@
+<title>semantic-router-rs — a Rust LLM router that reads the room</title>
+
+<style>
+  :root {
+    /* light (default) — schematic paper */
+    --board: #f3efe6;
+    --board-raised: #fffdf8;
+    --board-line: #ddd4bd;
+    --board-line-strong: #c9bd9e;
+    --trace: #a85a28;
+    --trace-dim: #c99568;
+    --signal: #15756a;
+    --ink: #1a231c;
+    --muted: #6b7268;
+    --guard: #a83a2b;
+    --radius: 3px;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --board: #0d1310;
+      --board-raised: #141c17;
+      --board-line: #263029;
+      --board-line-strong: #38473d;
+      --trace: #dc9c5e;
+      --trace-dim: #8a6a45;
+      --signal: #7fd8c9;
+      --ink: #eef3ee;
+      --muted: #8a9c92;
+      --guard: #e2665a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --board: #0d1310; --board-raised: #141c17; --board-line: #263029; --board-line-strong: #38473d;
+    --trace: #dc9c5e; --trace-dim: #8a6a45; --signal: #7fd8c9; --ink: #eef3ee; --muted: #8a9c92; --guard: #e2665a;
+  }
+  :root[data-theme="light"] {
+    --board: #f3efe6; --board-raised: #fffdf8; --board-line: #ddd4bd; --board-line-strong: #c9bd9e;
+    --trace: #a85a28; --trace-dim: #c99568; --signal: #15756a; --ink: #1a231c; --muted: #6b7268; --guard: #a83a2b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--board);
+    background-image:
+      linear-gradient(var(--board-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--board-line) 1px, transparent 1px);
+    background-size: 34px 34px;
+    background-attachment: fixed;
+    background-position: -1px -1px;
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--mono); text-wrap: balance; margin: 0; font-weight: 600; }
+  p { margin: 0; max-width: 62ch; }
+  a { color: var(--trace); }
+  a:focus-visible, button:focus-visible, .navlink:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 3px;
+  }
+  code, .mono { font-family: var(--mono); }
+  ::selection { background: var(--trace); color: var(--board); }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+
+  .wrap { max-width: 1180px; margin-inline: auto; padding-inline: clamp(1.25rem, 4vw, 3rem); }
+
+  /* ---------- nav ---------- */
+  header.site {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--board) 88%, transparent);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--board-line);
+  }
+  .navrow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.9rem; }
+  .brand { display: flex; align-items: baseline; gap: 0.55rem; font-family: var(--mono); font-weight: 600; font-size: 0.98rem; letter-spacing: -0.01em; }
+  .brand .dot { color: var(--trace); }
+  .navlinks { display: flex; gap: clamp(0.9rem, 2vw, 1.7rem); font-family: var(--mono); font-size: 0.82rem; }
+  .navlinks a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; padding-bottom: 2px; }
+  .navlinks a:hover { color: var(--ink); border-color: var(--board-line-strong); }
+  .navlinks a.cta { color: var(--trace); }
+
+  /* ---------- hero ---------- */
+  .hero { padding-block: clamp(2.5rem, 7vw, 5.5rem) clamp(2rem, 5vw, 3.5rem); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+  @media (max-width: 880px) { .hero-grid { grid-template-columns: 1fr; } }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--signal); display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 1.1rem;
+  }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; background: var(--signal); border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent); }
+
+  .hero h1 {
+    font-size: clamp(2.15rem, 3.4vw + 1rem, 3.4rem);
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+  }
+  .hero h1 em { font-style: normal; color: var(--trace); }
+  .hero p.lede { margin-top: 1.15rem; font-size: 1.08rem; color: var(--muted); max-width: 46ch; }
+
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 1.9rem; }
+  .btn {
+    font-family: var(--mono); font-size: 0.85rem; text-decoration: none;
+    padding: 0.72rem 1.15rem; border-radius: var(--radius); border: 1px solid var(--board-line-strong);
+    display: inline-flex; align-items: center; gap: 0.5rem; color: var(--ink);
+    transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+  }
+  .btn:hover { border-color: var(--trace); transform: translateY(-1px); }
+  .btn.primary { background: var(--trace); border-color: var(--trace); color: var(--board-raised); font-weight: 600; }
+  .btn.primary:hover { background: var(--trace-dim); border-color: var(--trace-dim); }
+
+  .hero-meta { display: flex; gap: clamp(1.1rem, 3vw, 1.9rem); margin-top: 2.1rem; flex-wrap: wrap; }
+  .hero-meta .stat { font-family: var(--mono); }
+  .hero-meta .stat b { display: block; font-size: 1.5rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .hero-meta .stat span { font-size: 0.74rem; color: var(--muted); letter-spacing: 0.03em; }
+
+  /* ---------- routing diagram ---------- */
+  .diagram-panel {
+    background: var(--board-raised); border: 1px solid var(--board-line); border-radius: var(--radius);
+    padding: 1.1rem 1.1rem 0.9rem;
+  }
+  .diagram-panel .panel-label {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+    display: flex; justify-content: space-between; margin-bottom: 0.6rem;
+  }
+  .diagram-panel svg { width: 100%; height: auto; display: block; }
+
+  .node-circle { fill: var(--board-raised); stroke: var(--board-line-strong); stroke-width: 1.6; transition: stroke 200ms ease, fill 200ms ease; }
+  .node-circle.core { fill: var(--board-line); }
+  .node-label { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+  .node-sub { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
+  .route-line { fill: none; stroke: var(--board-line-strong); stroke-width: 1.4; transition: stroke 200ms ease, stroke-width 200ms ease; }
+  .stem-line { fill: none; stroke: var(--board-line-strong); stroke-width: 1.6; }
+
+  [data-cat].active .route-line { stroke: var(--trace); stroke-width: 2.2; stroke-dasharray: 6 5; animation: flow 900ms linear infinite; }
+  [data-cat].active .node-circle { stroke: var(--trace); }
+  [data-cat].active .node-circle.dest { fill: color-mix(in srgb, var(--trace) 16%, var(--board-raised)); }
+  [data-cat].active .node-label { fill: var(--trace); }
+  @keyframes flow { to { stroke-dashoffset: -22; } }
+
+  .route-caption {
+    margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px dashed var(--board-line);
+    font-family: var(--mono); font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.5rem 0.7rem; align-items: baseline;
+    min-height: 2.6em;
+  }
+  .cap-prompt { color: var(--ink); }
+  .cap-arrow { color: var(--trace); }
+  .cap-cat { color: var(--signal); }
+  .cap-model { color: var(--muted); }
+  .cap-model::before { content: "· "; }
+
+  /* ---------- sections ---------- */
+  section { padding-block: clamp(2.6rem, 6vw, 4.5rem); border-top: 1px solid var(--board-line); }
+  .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; margin-bottom: clamp(1.6rem, 4vw, 2.4rem); flex-wrap: wrap; }
+  .section-head h2 { font-size: clamp(1.35rem, 1.6vw + 0.8rem, 1.9rem); letter-spacing: -0.01em; }
+  .section-head .tag { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+  .section-intro { color: var(--muted); margin-bottom: 2rem; font-size: 1.02rem; }
+
+  /* pipeline */
+  .pipeline { display: grid; gap: 0; border: 1px solid var(--board-line); border-radius: var(--radius); overflow: hidden; }
+  .pipe-step {
+    display: grid; grid-template-columns: 3.2rem minmax(0,1fr) minmax(0,1.6fr); gap: 1.1rem; align-items: start;
+    padding: 1.05rem 1.2rem; border-top: 1px solid var(--board-line);
+  }
+  .pipe-step:first-child { border-top: none; }
+  .pipe-step:nth-child(odd) { background: var(--board-raised); }
+  .pipe-num { font-family: var(--mono); color: var(--trace); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+  .pipe-title { font-family: var(--mono); font-weight: 600; font-size: 0.95rem; }
+  .pipe-desc { color: var(--muted); font-size: 0.93rem; }
+  @media (max-width: 640px) { .pipe-step { grid-template-columns: 2.2rem 1fr; } .pipe-desc { grid-column: 1 / -1; padding-left: 2.2rem; } }
+
+  /* strategies */
+  .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 760px) { .strategy-grid { grid-template-columns: 1fr; } }
+  .strategy-card { border: 1px solid var(--board-line); border-radius: var(--radius); padding: 1.4rem 1.4rem 1.5rem; background: var(--board-raised); }
+  .strategy-card h3 { font-size: 1.02rem; display: flex; align-items: baseline; justify-content: space-between; }
+  .strategy-card .accuracy { font-size: 1.9rem; color: var(--trace); font-variant-numeric: tabular-nums; }
+  .strategy-card p { color: var(--muted); font-size: 0.92rem; margin-top: 0.6rem; }
+  .strategy-card ul { margin: 0.9rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.88rem; }
+  .strategy-card li + li { margin-top: 0.3rem; }
+
+  .progress-strip { margin-top: 2.1rem; border: 1px solid var(--board-line); border-radius: var(--radius); padding: 1.3rem 1.4rem 1.5rem; background: var(--board-raised); }
+  .progress-strip .ps-label { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1rem; }
+  .ps-row { display: grid; grid-template-columns: 9.5rem minmax(0,1fr) 3.5rem; gap: 0.9rem; align-items: center; margin-block: 0.55rem; }
+  .ps-row .ps-name { font-family: var(--mono); font-size: 0.84rem; color: var(--ink); }
+  .ps-track { height: 10px; background: var(--board-line); border-radius: 2px; overflow: hidden; }
+  .ps-fill { height: 100%; background: var(--trace-dim); }
+  .ps-row.final .ps-fill { background: var(--trace); }
+  .ps-row.final .ps-name, .ps-row.final .ps-val { color: var(--trace); font-weight: 600; }
+  .ps-val { font-family: var(--mono); font-size: 0.86rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .ps-note { margin-top: 1.1rem; font-size: 0.86rem; color: var(--muted); }
+
+  /* features */
+  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--board-line); border: 1px solid var(--board-line); border-radius: var(--radius); overflow: hidden; }
+  @media (max-width: 860px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .feature-grid { grid-template-columns: 1fr; } }
+  .feature-cell { background: var(--board-raised); padding: 1.4rem; }
+  .feature-cell .f-label { font-family: var(--mono); font-size: 0.72rem; color: var(--signal); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.55rem; }
+  .feature-cell h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .feature-cell p { color: var(--muted); font-size: 0.88rem; }
+
+  /* quickstart */
+  .quickstart-grid { display: grid; gap: 1.1rem; }
+  .code-block { border: 1px solid var(--board-line); border-radius: var(--radius); background: var(--board-raised); overflow: hidden; }
+  .code-block .code-label { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); padding: 0.6rem 1rem; border-bottom: 1px solid var(--board-line); }
+  .code-block pre { margin: 0; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.84rem; line-height: 1.65; }
+  .code-block code { color: var(--ink); }
+  .code-block .c-comment { color: var(--muted); }
+  .code-block .c-flag { color: var(--signal); }
+
+  /* footer */
+  footer.site { border-top: 1px solid var(--board-line); padding-block: 2.2rem; }
+  .footer-row { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+  .footer-row a { color: var(--muted); }
+  .footer-row a:hover { color: var(--trace); }
+  .footer-links { display: flex; gap: 1.4rem; }
+</style>
+
+<header class="site">
+  <div class="wrap navrow">
+    <div class="brand"><span class="dot">&#9679;</span>semantic-router-rs</div>
+    <nav class="navlinks">
+      <a href="#how-it-works">how it works</a>
+      <a href="#strategies">accuracy</a>
+      <a href="#features">features</a>
+      <a href="#quickstart">quickstart</a>
+      <a class="cta" href="https://github.com/Shyamcharan06/semantic-router-rs">source &#8599;</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="eyebrow">rust &middot; candle &middot; self-hosted</div>
+        <h1>Route every prompt to <em>the model built for it.</em></h1>
+        <p class="lede">A Mixture-of-Models router, written in Rust: it classifies each request in-process with a local embedding model and dispatches it to whichever backend actually handles that kind of task — no Python at inference time, no training required to start.</p>
+        <div class="hero-ctas">
+          <a class="btn primary" href="https://github.com/Shyamcharan06/semantic-router-rs">View source on GitHub</a>
+          <a class="btn" href="#quickstart">Run it locally &#8595;</a>
+        </div>
+        <div class="hero-meta">
+          <div class="stat"><b>94%</b><span>best measured routing accuracy</span></div>
+          <div class="stat"><b>36</b><span>tests, green on GitHub Actions</span></div>
+          <div class="stat"><b>5</b><span>categories, 5 backend models</span></div>
+        </div>
+      </div>
+
+      <div class="diagram-panel">
+        <div class="panel-label"><span>live routing decision</span><span>POST /v1/chat/completions</span></div>
+        <svg viewBox="0 0 920 480" role="img" aria-label="Diagram of a prompt flowing through prompt guard, PII scan, and the router to one of five backend models">
+          <path class="stem-line" d="M72,240 L184,240"></path>
+          <path class="stem-line" d="M236,240 L350,240"></path>
+
+          <path class="route-line" data-cat="coding" d="M410,232 C 560,140 620,70 806,60"></path>
+          <path class="route-line" data-cat="math" d="M410,236 C 560,190 620,150 806,150"></path>
+          <path class="route-line" data-cat="creative" d="M410,240 L 806,240"></path>
+          <path class="route-line" data-cat="legal" d="M410,244 C 560,290 620,330 806,330"></path>
+          <path class="route-line" data-cat="general" d="M410,248 C 560,340 620,410 806,420"></path>
+
+          <g>
+            <circle class="node-circle" cx="50" cy="240" r="22"></circle>
+            <text class="node-label" x="50" y="279" text-anchor="middle">prompt</text>
+          </g>
+          <g>
+            <circle class="node-circle core" cx="210" cy="240" r="26"></circle>
+            <text class="node-label" x="210" y="200" text-anchor="middle">guard + pii</text>
+          </g>
+          <g>
+            <circle class="node-circle core" cx="380" cy="240" r="30"></circle>
+            <text class="node-label" x="380" y="196" text-anchor="middle">embed + route</text>
+          </g>
+
+          <g data-cat="coding">
+            <circle class="node-circle dest" cx="830" cy="60" r="22"></circle>
+            <text class="node-label" x="792" y="42" text-anchor="end">coding</text>
+            <text class="node-sub" x="792" y="70" text-anchor="end">qwen2.5-coder:1.5b</text>
+          </g>
+          <g data-cat="math">
+            <circle class="node-circle dest" cx="830" cy="150" r="22"></circle>
+            <text class="node-label" x="792" y="132" text-anchor="end">math_reasoning</text>
+            <text class="node-sub" x="792" y="160" text-anchor="end">qwen2.5:1.5b</text>
+          </g>
+          <g data-cat="creative">
+            <circle class="node-circle dest" cx="830" cy="240" r="22"></circle>
+            <text class="node-label" x="792" y="222" text-anchor="end">creative_writing</text>
+            <text class="node-sub" x="792" y="250" text-anchor="end">llama3.2:1b</text>
+          </g>
+          <g data-cat="legal">
+            <circle class="node-circle dest" cx="830" cy="330" r="22"></circle>
+            <text class="node-label" x="792" y="312" text-anchor="end">business_legal</text>
+            <text class="node-sub" x="792" y="340" text-anchor="end">gemma2:2b</text>
+          </g>
+          <g data-cat="general">
+            <circle class="node-circle dest" cx="830" cy="420" r="22"></circle>
+            <text class="node-label" x="792" y="402" text-anchor="end">general_chat</text>
+            <text class="node-sub" x="792" y="430" text-anchor="end">llama3.2:1b</text>
+          </g>
+        </svg>
+        <div class="route-caption" id="routeCaption" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how-it-works">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>How a request moves through it</h2>
+        <span class="tag">router/src/server.rs</span>
+      </div>
+      <p class="section-intro">Every stage below is a real, separately-timed span — set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> and each request becomes one trace with per-stage latency in Jaeger.</p>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <div class="pipe-num">01</div>
+          <div class="pipe-title">Prompt guard</div>
+          <div class="pipe-desc">Reject requests matching known jailbreak phrases before any embedding or backend call happens. Extendable via config.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">02</div>
+          <div class="pipe-title">PII scan</div>
+          <div class="pipe-desc">Block or redact emails, phone numbers, SSNs, card numbers, and IPv4 addresses in the message before it goes any further.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">03</div>
+          <div class="pipe-title">Embed</div>
+          <div class="pipe-desc">Candle + MiniLM turn the (possibly redacted) message into a 384-dimension vector, in-process — no Python, no ONNX runtime.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">04</div>
+          <div class="pipe-title">Cache check</div>
+          <div class="pipe-desc">Non-streaming requests check a semantic cache first; a near-duplicate prompt returns a cached response and never reaches a backend.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">05</div>
+          <div class="pipe-title">Route</div>
+          <div class="pipe-desc">Cosine similarity against category examples, or a trained classifier, picks the category — or falls back to a default backend.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">06</div>
+          <div class="pipe-title">Dispatch</div>
+          <div class="pipe-desc">Proxy to that category's backend with the model field rewritten, or pipe its Server-Sent-Events response straight through unbuffered.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="strategies">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Two ways to route, both measured</h2>
+        <span class="tag">eval/run_eval.py &middot; 100 held-out prompts</span>
+      </div>
+      <p class="section-intro">Neither number is assumed. Both come from the same 100-prompt labeled set, held out from whatever the router was given to learn from.</p>
+
+      <div class="strategy-grid">
+        <div class="strategy-card">
+          <h3>Similarity <span class="accuracy">88%</span></h3>
+          <p>Cosine similarity against 12 example utterances per category. Zero training — edit the category list in <code>routes.yaml</code> and it adapts instantly. The default.</p>
+          <ul>
+            <li>No training artifact to go stale</li>
+            <li>Precision drops on genuinely ambiguous prompts</li>
+            <li>Doubling examples from 6&rarr;12 took accuracy 71%&rarr;88%</li>
+          </ul>
+        </div>
+        <div class="strategy-card">
+          <h3>Classifier <span class="accuracy">94%</span></h3>
+          <p>A logistic-regression probe trained on the router's own <code>/embed</code> output for those same 60 examples — one embedding implementation, never re-derived in Python.</p>
+          <ul>
+            <li>Beats similarity, but goes stale if categories change</li>
+            <li>Weights are committed &mdash; works immediately, no retraining</li>
+            <li>Opt-in via <code>routing.strategy: classifier</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="progress-strip">
+        <div class="ps-label">getting the classifier there</div>
+        <div class="ps-row">
+          <div class="ps-name">C = 1.0 (default)</div>
+          <div class="ps-track"><div class="ps-fill" style="width:7%"></div></div>
+          <div class="ps-val">7%</div>
+        </div>
+        <div class="ps-row">
+          <div class="ps-name">cross-validated C</div>
+          <div class="ps-track"><div class="ps-fill" style="width:63%"></div></div>
+          <div class="ps-val">63%</div>
+        </div>
+        <div class="ps-row final">
+          <div class="ps-name">+ re-tuned threshold</div>
+          <div class="ps-track"><div class="ps-fill" style="width:94%"></div></div>
+          <div class="ps-val">94%</div>
+        </div>
+        <p class="ps-note">First attempt scored worse than random: 60 examples in 384 dimensions, unregularized, memorized the training set and generalized to nothing. 5-fold cross-validation on the training examples (never the eval set) fixed the regularization; every remaining miss was the classifier declining to guess, not guessing wrong — so a re-tuned confidence threshold closed most of the rest.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What ships with it</h2>
+        <span class="tag">router/src/</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-cell">
+          <div class="f-label">security</div>
+          <h3>PII &amp; prompt guard</h3>
+          <p>Regex-based PII detection (block or redact) and jailbreak-phrase blocking, both off by default and toggled per deployment.</p>
+        </div>
+        <div class="feature-cell">
+          <div class="f-label">transport</div>
+          <h3>SSE streaming</h3>
+          <p><code>"stream": true</code> skips the cache and pipes the backend's response straight through, unbuffered, headers and all.</p>
+        </div>
+        <div class="feature-cell">
+          <div class="f-label">performance</div>
+          <h3>Semantic cache</h3>
+          <p>Brute-force cosine cache short-circuits near-duplicate prompts before they ever reach a backend model.</p>
+        </div>
+        <div class="feature-cell">
+          <div class="f-label">observability</div>
+          <h3>OpenTelemetry tracing</h3>
+          <p>Per-stage spans exported over OTLP; docker-compose ships Jaeger alongside the router for zero-config trace viewing.</p>
+        </div>
+        <div class="feature-cell">
+          <div class="f-label">deployment</div>
+          <h3>Kubernetes</h3>
+          <p>Deployment with health probes, a ClusterIP Service, and a Kustomization that bakes config into a ConfigMap.</p>
+        </div>
+        <div class="feature-cell">
+          <div class="f-label">quality</div>
+          <h3>CI on every push</h3>
+          <p><code>fmt --check</code>, <code>clippy -D warnings</code>, and the full test suite, verified green on GitHub's own runners.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Get it running</h2>
+        <span class="tag">~2 minutes, first model download aside</span>
+      </div>
+      <div class="quickstart-grid">
+        <div class="code-block">
+          <div class="code-label">1. clone and start a backend to route to</div>
+          <pre><code>git clone https://github.com/Shyamcharan06/semantic-router-rs
+<span class="c-comment">cd semantic-router-rs</span>
+cp config/routes.example.yaml config/routes.yaml
+
+<span class="c-comment"># mock backend: echoes back which model it was routed to,</span>
+<span class="c-comment"># no real API key needed to see routing work</span>
+python -m venv .venv &amp;&amp; .venv/bin/pip install -r eval/requirements.txt
+.venv/bin/python eval/mock_backend.py &amp;</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">2. run the router</div>
+          <pre><code><span class="c-comment"># first run downloads ~90MB of MiniLM weights from the HF Hub</span>
+ROUTER_CONFIG=config/routes.yaml cargo run <span class="c-flag">--release</span></code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">3. see a routing decision</div>
+          <pre><code>curl <span class="c-flag">"http://localhost:8088/route?q=Write+a+Python+function+to+sort+a+list"</span>
+
+<span class="c-comment"># {"category":"coding","model":"coder-model","score":0.91...}</span></code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">4. or the full round trip</div>
+          <pre><code>curl http://localhost:8088/v1/chat/completions \
+  -H <span class="c-flag">'content-type: application/json'</span> \
+  -d <span class="c-flag">'{"messages":[{"role":"user","content":"Write a poem about the sea"}]}'</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap footer-row">
+    <div>MIT licensed &middot; inspired by <a href="https://github.com/vllm-project/semantic-router">vllm-project/semantic-router</a>, built from scratch</div>
+    <div class="footer-links">
+      <a href="https://github.com/Shyamcharan06/semantic-router-rs">github</a>
+      <a href="https://github.com/Shyamcharan06/semantic-router-rs/actions">ci</a>
+      <a href="https://github.com/Shyamcharan06/semantic-router-rs/blob/master/README.md">readme</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var categories = [
+      { key: "coding", prompt: "“Debug this JavaScript code that keeps throwing an undefined error”", model: "qwen2.5-coder:1.5b" },
+      { key: "math", prompt: "“Explain the proof of the Pythagorean theorem step by step”", model: "qwen2.5:1.5b" },
+      { key: "creative", prompt: "“Write a haiku about a rainy Tuesday morning”", model: "llama3.2:1b" },
+      { key: "legal", prompt: "“Draft the key clauses of a mutual non-disclosure agreement”", model: "gemma2:2b" },
+      { key: "general", prompt: "“Recommend a good book for someone who likes mystery novels”", model: "llama3.2:1b" }
+    ];
+    var idx = 0;
+    var caption = document.getElementById("routeCaption");
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function setActive(i) {
+      var nodes = document.querySelectorAll("[data-cat]");
+      for (var n = 0; n < nodes.length; n++) { nodes[n].classList.remove("active"); }
+      var cat = categories[i];
+      var matches = document.querySelectorAll('[data-cat="' + cat.key + '"]');
+      for (var m = 0; m < matches.length; m++) { matches[m].classList.add("active"); }
+      if (caption) {
+        caption.innerHTML =
+          '<span class="cap-prompt">' + cat.prompt + '</span>' +
+          '<span class="cap-arrow">routed to</span>' +
+          '<span class="cap-cat">' + cat.key + '</span>' +
+          '<span class="cap-model">' + cat.model + '</span>';
+      }
+    }
+
+    setActive(0);
+    if (!reduceMotion) {
+      setInterval(function () {
+        idx = (idx + 1) % categories.length;
+        setActive(idx);
+      }, 3600);
+    }
+  })();
+</script>
