@@ -74,7 +74,7 @@
   .navrow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.9rem; }
   .brand { display: flex; align-items: baseline; gap: 0.55rem; font-family: var(--mono); font-weight: 600; font-size: 0.98rem; letter-spacing: -0.01em; }
   .brand .dot { color: var(--trace); }
-  .navlinks { display: flex; gap: clamp(0.9rem, 2vw, 1.7rem); font-family: var(--mono); font-size: 0.82rem; }
+  .navlinks { display: flex; flex-wrap: wrap; row-gap: 0.4rem; gap: clamp(0.9rem, 2vw, 1.7rem); font-family: var(--mono); font-size: 0.82rem; }
   .navlinks a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; padding-bottom: 2px; }
   .navlinks a:hover { color: var(--ink); border-color: var(--board-line-strong); }
   .navlinks a.cta { color: var(--trace); }
@@ -208,12 +208,48 @@
   .code-block .c-comment { color: var(--muted); }
   .code-block .c-flag { color: var(--signal); }
 
+  /* api reference */
+  .api-list { display: grid; gap: 1.1rem; }
+  .api-endpoint { border: 1px solid var(--board-line); border-radius: var(--radius); background: var(--board-raised); overflow: hidden; }
+  .api-head { display: flex; align-items: center; gap: 0.8rem; padding: 0.85rem 1.15rem; border-bottom: 1px solid var(--board-line); flex-wrap: wrap; }
+  .api-method { font-family: var(--mono); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; padding: 0.18rem 0.55rem; border-radius: 2px; }
+  .api-method.get { color: var(--signal); border: 1px solid color-mix(in srgb, var(--signal) 45%, transparent); }
+  .api-method.post { color: var(--trace); border: 1px solid color-mix(in srgb, var(--trace) 45%, transparent); }
+  .api-path { font-family: var(--mono); font-size: 0.92rem; }
+  .api-desc { color: var(--muted); font-size: 0.85rem; margin-left: auto; }
+  @media (max-width: 640px) { .api-desc { margin-left: 0; } }
+  .api-body { display: grid; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px) { .api-body { grid-template-columns: 1fr; } }
+  .api-body > div { padding: 0.9rem 1.15rem; min-width: 0; }
+  .api-body > div + div { border-left: 1px solid var(--board-line); }
+  @media (max-width: 760px) { .api-body > div + div { border-left: none; border-top: 1px solid var(--board-line); } }
+  .api-sub-label { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.55rem; }
+  .api-body pre { margin: 0; font-family: var(--mono); font-size: 0.8rem; overflow-x: auto; line-height: 1.6; }
+  .api-headers { margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px dashed var(--board-line); font-family: var(--mono); font-size: 0.76rem; color: var(--muted); }
+  .api-headers div + div { margin-top: 0.25rem; }
+  .api-headers b { color: var(--ink); font-weight: 600; }
+
+  /* bill of materials */
+  .bom-wrap { overflow-x: auto; border: 1px solid var(--board-line); border-radius: var(--radius); }
+  table.bom { width: 100%; border-collapse: collapse; font-size: 0.87rem; background: var(--board-raised); min-width: 560px; }
+  table.bom th { text-align: left; font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0.7rem 1.1rem; border-bottom: 1px solid var(--board-line-strong); font-weight: 600; }
+  table.bom td { padding: 0.68rem 1.1rem; border-bottom: 1px solid var(--board-line); vertical-align: top; }
+  table.bom tr:last-child td { border-bottom: none; }
+  table.bom td.crate { font-family: var(--mono); color: var(--ink); white-space: nowrap; }
+  table.bom td.role { color: var(--signal); white-space: nowrap; }
+  table.bom td.why { color: var(--muted); }
+
   /* footer */
   footer.site { border-top: 1px solid var(--board-line); padding-block: 2.2rem; }
   .footer-row { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
   .footer-row a { color: var(--muted); }
   .footer-row a:hover { color: var(--trace); }
-  .footer-links { display: flex; gap: 1.4rem; }
+  .footer-links { display: flex; gap: 1.4rem; flex-wrap: wrap; }
+  .footer-mirrors { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--board-line); font-family: var(--mono); font-size: 0.78rem; color: var(--muted); display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: baseline; }
+  .footer-mirrors b { color: var(--ink); font-weight: 600; }
+  .footer-mirrors a { color: var(--signal); }
+  .footer-mirrors a:hover { color: var(--trace); }
+  .footer-mirrors .sep { color: var(--board-line-strong); }
 </style>
 
 <header class="site">
@@ -223,6 +259,8 @@
       <a href="#how-it-works">how it works</a>
       <a href="#strategies">accuracy</a>
       <a href="#features">features</a>
+      <a href="#api">api</a>
+      <a href="#stack">stack</a>
       <a href="#quickstart">quickstart</a>
       <a class="cta" href="https://github.com/Shyamcharan06/semantic-router-rs">source &#8599;</a>
     </nav>
@@ -437,6 +475,138 @@
     </div>
   </section>
 
+  <section id="api">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>API reference</h2>
+        <span class="tag">OpenAI-compatible on the main endpoint</span>
+      </div>
+      <p class="section-intro">Four endpoints, all plain JSON over HTTP. The debug ones (<code>/route</code>, <code>/embed</code>) exist specifically so routing can be inspected and the classifier trained without ever calling a real backend.</p>
+
+      <div class="api-list">
+        <div class="api-endpoint">
+          <div class="api-head">
+            <span class="api-method get">GET</span>
+            <span class="api-path">/healthz</span>
+            <span class="api-desc">Liveness probe — what the k8s Deployment's readiness/liveness checks hit.</span>
+          </div>
+          <div class="api-body">
+            <div>
+              <div class="api-sub-label">request</div>
+              <pre><code>curl http://localhost:8088/healthz</code></pre>
+            </div>
+            <div>
+              <div class="api-sub-label">response &middot; 200</div>
+              <pre><code>ok</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-endpoint">
+          <div class="api-head">
+            <span class="api-method get">GET</span>
+            <span class="api-path">/route?q=&lt;text&gt;</span>
+            <span class="api-desc">Routing decision only — no backend is called. What eval/run_eval.py hits 100 times per run.</span>
+          </div>
+          <div class="api-body">
+            <div>
+              <div class="api-sub-label">request</div>
+              <pre><code>curl --get http://localhost:8088/route \
+  --data-urlencode <span class="c-flag">"q=Draft a non-disclosure agreement for a contractor"</span></code></pre>
+            </div>
+            <div>
+              <div class="api-sub-label">response &middot; 200 (real capture)</div>
+              <pre><code>{
+  "category": "business_legal",
+  "model": "business-model",
+  "query": "Draft a non-disclosure...",
+  "score": 0.9761
+}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-endpoint">
+          <div class="api-head">
+            <span class="api-method get">GET</span>
+            <span class="api-path">/embed?q=&lt;text&gt;</span>
+            <span class="api-desc">Raw sentence embedding — what eval/train_classifier.py calls to build training features.</span>
+          </div>
+          <div class="api-body">
+            <div>
+              <div class="api-sub-label">request</div>
+              <pre><code>curl --get http://localhost:8088/embed \
+  --data-urlencode <span class="c-flag">"q=hello"</span></code></pre>
+            </div>
+            <div>
+              <div class="api-sub-label">response &middot; 200</div>
+              <pre><code>{
+  "embedding": [0.031, -0.084,
+    0.019, <span class="c-comment">/* ... */</span>, -0.027]
+}
+<span class="c-comment">// 384 floats, mean-pooled + L2-normalized</span></code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-endpoint">
+          <div class="api-head">
+            <span class="api-method post">POST</span>
+            <span class="api-path">/v1/chat/completions</span>
+            <span class="api-desc">The real thing — routes, then proxies to (or streams from) the matched backend.</span>
+          </div>
+          <div class="api-body">
+            <div>
+              <div class="api-sub-label">request</div>
+              <pre><code>curl http://localhost:8088/v1/chat/completions \
+  -H <span class="c-flag">'content-type: application/json'</span> \
+  -d <span class="c-flag">'{"messages":[{"role":"user",
+    "content":"Write a poem about the sea"}]}'</span></code></pre>
+            </div>
+            <div>
+              <div class="api-sub-label">response headers &middot; real capture</div>
+              <pre><code>x-router-category: creative_writing
+x-router-score: 0.8496
+x-router-cache: miss</code></pre>
+              <div class="api-headers">
+                <div><b>x-router-cache</b> is <b>hit</b> for a semantic-cache match, <b>miss</b> for a fresh backend call, or <b>bypassed</b> for a <code>stream: true</code> request (streaming skips the cache).</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="stack">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Bill of materials</h2>
+        <span class="tag">router/Cargo.toml</span>
+      </div>
+      <p class="section-intro">The crates doing the actual work, not the full dependency tree.</p>
+      <div class="bom-wrap">
+        <table class="bom">
+          <thead>
+            <tr><th>Crate</th><th>Role</th><th>Why it's there</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="crate">candle-core / candle-nn / candle-transformers</td><td class="role">embedding inference</td><td class="why">Pure-Rust BERT forward pass for MiniLM &mdash; no ONNX runtime, no Python process.</td></tr>
+            <tr><td class="crate">hf-hub</td><td class="role">model download</td><td class="why">Pulls just config.json / tokenizer.json / model.safetensors from the HF Hub at startup, not the whole multi-format repo.</td></tr>
+            <tr><td class="crate">tokenizers</td><td class="role">tokenization</td><td class="why">Hugging Face's own Rust BERT tokenizer.</td></tr>
+            <tr><td class="crate">axum / tower-http</td><td class="role">HTTP server</td><td class="why">Routing, extractors, and the TraceLayer that gives every request its root tracing span.</td></tr>
+            <tr><td class="crate">tokio</td><td class="role">async runtime</td><td class="why">Everything's async, including the SSE streaming passthrough.</td></tr>
+            <tr><td class="crate">reqwest</td><td class="role">backend client</td><td class="why">Forwards the routed request to whatever OpenAI-compatible backend is configured.</td></tr>
+            <tr><td class="crate">regex</td><td class="role">PII detection</td><td class="why">Email / phone / SSN / card / IPv4 pattern matching in router/src/pii.rs.</td></tr>
+            <tr><td class="crate">opentelemetry-otlp / tracing-opentelemetry</td><td class="role">tracing</td><td class="why">Exports per-stage spans over OTLP to Jaeger when enabled.</td></tr>
+            <tr><td class="crate">serde / serde_yaml / serde_json</td><td class="role">config &amp; wire format</td><td class="why">routes.yaml schema in, chat-completion JSON out.</td></tr>
+            <tr><td class="crate">anyhow / thiserror</td><td class="role">error handling</td><td class="why">Contextual errors all the way through the pipeline, down to the HTTP error response.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section id="quickstart">
     <div class="wrap">
       <div class="section-head">
@@ -472,18 +642,40 @@ ROUTER_CONFIG=config/routes.yaml cargo run <span class="c-flag">--release</span>
   -H <span class="c-flag">'content-type: application/json'</span> \
   -d <span class="c-flag">'{"messages":[{"role":"user","content":"Write a poem about the sea"}]}'</span></code></pre>
         </div>
+        <div class="code-block">
+          <div class="code-label">5. switch strategy or turn on security &mdash; config/routes.yaml</div>
+          <pre><code>routing:
+  strategy: classifier        <span class="c-comment"># or "similarity" (default, zero-training)</span>
+  confidence_threshold: 0.25  <span class="c-comment"># 0.35 if strategy is "similarity"</span>
+
+security:
+  pii:
+    enabled: true
+    action: redact             <span class="c-comment"># or "block"</span>
+  prompt_guard:
+    enabled: true
+    extra_patterns: []          <span class="c-comment"># on top of the built-in jailbreak list</span></code></pre>
+        </div>
       </div>
     </div>
   </section>
 </main>
 
 <footer class="site">
-  <div class="wrap footer-row">
-    <div>MIT licensed &middot; inspired by <a href="https://github.com/vllm-project/semantic-router">vllm-project/semantic-router</a>, built from scratch</div>
-    <div class="footer-links">
-      <a href="https://github.com/Shyamcharan06/semantic-router-rs">github</a>
-      <a href="https://github.com/Shyamcharan06/semantic-router-rs/actions">ci</a>
-      <a href="https://github.com/Shyamcharan06/semantic-router-rs/blob/master/README.md">readme</a>
+  <div class="wrap">
+    <div class="footer-row">
+      <div>MIT licensed &middot; inspired by <a href="https://github.com/vllm-project/semantic-router">vllm-project/semantic-router</a>, built from scratch</div>
+      <div class="footer-links">
+        <a href="https://github.com/Shyamcharan06/semantic-router-rs">github</a>
+        <a href="https://github.com/Shyamcharan06/semantic-router-rs/actions">ci</a>
+        <a href="https://github.com/Shyamcharan06/semantic-router-rs/blob/master/README.md">readme</a>
+      </div>
+    </div>
+    <div class="footer-mirrors">
+      <b>mirrors</b>
+      <a href="https://semantic-router-rs.vercel.app">semantic-router-rs.vercel.app</a>
+      <span class="sep">&middot;</span>
+      <a href="https://shyamcharan06.github.io/semantic-router-rs/">shyamcharan06.github.io/semantic-router-rs</a>
     </div>
   </div>
 </footer>
