@@ -18,8 +18,21 @@ embedding:
   revision: main
 
 routing:
-  # Minimum cosine similarity required to route to a category. Below this,
-  # the request falls back to `default`.
+  # "similarity": cosine similarity vs. each category's example utterances
+  #   below, no training required (see routing.rs). Adapts instantly if you
+  #   edit `categories` -- always the safe default.
+  # "classifier": a small logistic-regression probe trained on frozen MiniLM
+  #   embeddings of these same examples (see eval/train_classifier.py),
+  #   loaded from routing.classifier_path. Outperformed similarity in our
+  #   measurement (94% vs 88% on eval/dataset.jsonl) but goes stale if you
+  #   change `categories` without retraining -- see README.
+  strategy: similarity
+  classifier_path: config/classifier.json
+  # Minimum confidence required to route to a category; below this, the
+  # request falls back to `default`. Units differ by strategy: cosine
+  # similarity (roughly -1..1) for "similarity", softmax probability (0..1)
+  # for "classifier" -- 0.35 and 0.25 are what we measured working well for
+  # each, respectively.
   confidence_threshold: 0.35
 
 cache:

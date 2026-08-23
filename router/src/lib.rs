@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod classifier;
 pub mod config;
 pub mod embeddings;
 pub mod pii;
@@ -6,3 +7,4 @@ pub mod prompt_guard;
 pub mod proxy;
 pub mod routing;
 pub mod server;
+pub mod telemetry;

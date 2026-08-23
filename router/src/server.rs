@@ -4,7 +4,7 @@ use crate::embeddings::Embedder;
 use crate::pii;
 use crate::prompt_guard::PromptGuard;
 use crate::proxy::{BackendTarget, Proxy};
-use crate::routing::SemanticRouter;
+use crate::routing::RoutingStrategy;
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
@@ -15,10 +15,12 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tower_http::trace::TraceLayer;
+use tracing::Instrument;
 
 pub struct AppState {
     pub embedder: Arc<Embedder>,
-    pub router: Arc<SemanticRouter>,
+    pub router: Arc<RoutingStrategy>,
     pub backends: HashMap<String, BackendTarget>,
     pub default_backend: BackendTarget,
     pub default_backend_name: String,
@@ -32,7 +34,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/route", get(route_debug))
+        .route("/embed", get(embed_debug))
         .route("/v1/chat/completions", post(chat_completions))
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
@@ -84,12 +88,26 @@ async fn route_debug(
     })))
 }
 
+/// Raw embedding for a piece of text -- used by eval/train_classifier.py so
+/// there's exactly one embedding implementation (this one) that both
+/// routing strategies are trained/evaluated against, never a second copy
+/// re-implemented in Python.
+async fn embed_debug(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<RouteQuery>,
+) -> Result<Json<Value>, AppError> {
+    let embedding = state.embedder.embed(&params.q)?;
+    Ok(Json(serde_json::json!({ "embedding": embedding })))
+}
+
 async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Json<Value>) -> Result<Response, AppError> {
     let mut query_text = extract_last_user_message(&body)
         .ok_or_else(|| anyhow::anyhow!("request must include a message with role 'user' and string content"))?;
 
     if state.security.prompt_guard.enabled {
-        if let Some(pattern) = state.prompt_guard.matched_pattern(&query_text) {
+        let matched = tracing::info_span!("prompt_guard")
+            .in_scope(|| state.prompt_guard.matched_pattern(&query_text).map(str::to_string));
+        if let Some(pattern) = matched {
             return Ok(security_block_response(
                 StatusCode::FORBIDDEN,
                 "prompt_guard_triggered",
@@ -99,7 +117,7 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
     }
 
     if state.security.pii.enabled {
-        let findings = pii::scan(&query_text);
+        let findings = tracing::info_span!("pii_scan").in_scope(|| pii::scan(&query_text));
         if !findings.is_empty() {
             match state.security.pii.action {
                 PiiAction::Block => {
@@ -111,7 +129,7 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
                     ));
                 }
                 PiiAction::Redact => {
-                    let (redacted_text, _found) = pii::redact(&query_text);
+                    let (redacted_text, _found) = tracing::info_span!("pii_redact").in_scope(|| pii::redact(&query_text));
                     set_last_user_message(&mut body, &redacted_text);
                     query_text = redacted_text;
                 }
@@ -119,18 +137,19 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
         }
     }
 
-    let embedding = state.embedder.embed(&query_text)?;
+    let embedding = tracing::info_span!("embed").in_scope(|| state.embedder.embed(&query_text))?;
     let is_streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
 
     if !is_streaming {
-        if let Some(hit) = state.cache.get(&embedding).await {
+        let cache_hit = state.cache.get(&embedding).instrument(tracing::info_span!("cache_lookup")).await;
+        if let Some(hit) = cache_hit {
             let category_label = hit.category.clone().unwrap_or_else(|| state.default_backend_name.clone());
             let headers = routing_headers(&category_label, hit.score, "hit");
             return Ok((headers, Json(hit.response)).into_response());
         }
     }
 
-    let decision = state.router.route(&embedding);
+    let decision = tracing::info_span!("route").in_scope(|| state.router.route(&embedding));
     let target = match &decision.category {
         Some(name) => state.backends.get(name).cloned().unwrap_or_else(|| state.default_backend.clone()),
         None => state.default_backend.clone(),
@@ -138,7 +157,11 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
     let category_label = decision.category.clone().unwrap_or_else(|| state.default_backend_name.clone());
 
     if is_streaming {
-        let upstream = state.proxy.forward_chat_completion_stream(&target, body).await?;
+        let upstream = state
+            .proxy
+            .forward_chat_completion_stream(&target, body)
+            .instrument(tracing::info_span!("proxy_backend_call", backend = %target.base_url, model = %target.model, streaming = true))
+            .await?;
         // Pass through whatever content-type the backend actually sent
         // (a backend that doesn't support streaming might just return
         // ordinary JSON even for a `stream: true` request) rather than
@@ -160,8 +183,12 @@ async fn chat_completions(State(state): State<Arc<AppState>>, Json(mut body): Js
         return Ok(response);
     }
 
-    let response = state.proxy.forward_chat_completion(&target, body).await?;
-    state.cache.put(embedding, response.clone(), decision.category.clone()).await;
+    let response = state
+        .proxy
+        .forward_chat_completion(&target, body)
+        .instrument(tracing::info_span!("proxy_backend_call", backend = %target.base_url, model = %target.model, streaming = false))
+        .await?;
+    state.cache.put(embedding, response.clone(), decision.category.clone()).instrument(tracing::info_span!("cache_put")).await;
 
     let headers = routing_headers(&category_label, decision.score, "miss");
     Ok((headers, Json(response)).into_response())

@@ -1,8 +1,35 @@
+use crate::classifier::Classifier;
+
 /// A category with its example utterances already embedded at startup.
 #[derive(Debug, Clone)]
 pub struct CategoryIndex {
     pub name: String,
     pub embeddings: Vec<Vec<f32>>,
+}
+
+/// The two ways an embedding gets turned into a routing decision: pure
+/// max-cosine-similarity against example utterances (no training), or a
+/// small trained linear classifier (see eval/train_classifier.py). Picked
+/// via `routing.strategy` in `routes.yaml`.
+pub enum RoutingStrategy {
+    Similarity(SemanticRouter),
+    Classifier { classifier: Classifier, confidence_threshold: f32 },
+}
+
+impl RoutingStrategy {
+    pub fn route(&self, query_embedding: &[f32]) -> RouteDecision {
+        match self {
+            RoutingStrategy::Similarity(router) => router.route(query_embedding),
+            RoutingStrategy::Classifier { classifier, confidence_threshold } => {
+                let (label, confidence) = classifier.predict(query_embedding);
+                if confidence >= *confidence_threshold {
+                    RouteDecision { category: Some(label), score: confidence }
+                } else {
+                    RouteDecision { category: None, score: confidence }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

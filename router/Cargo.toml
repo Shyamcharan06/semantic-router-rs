@@ -11,6 +11,9 @@ candle-nn = "0.11.0"
 candle-transformers = "0.11.0"
 chrono = "0.4.45"
 hf-hub = { version = "1.0.0", features = ["rustls-tls"] }
+opentelemetry = "0.32.0"
+opentelemetry-otlp = "0.32.0"
+opentelemetry_sdk = { version = "0.32.1", features = ["rt-tokio"] }
 regex = "1.13.1"
 reqwest = { version = "0.13.4", features = ["json", "rustls", "stream"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -19,6 +22,8 @@ serde_yaml = "0.9.34"
 thiserror = "2.0.20"
 tokenizers = "0.23.1"
 tokio = { version = "1.53.1", features = ["full"] }
+tower-http = { version = "0.7.0", features = ["trace"] }
 tracing = "0.1.44"
+tracing-opentelemetry = "0.33.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.25.0", features = ["v4"] }

@@ -1,14 +1,13 @@
 use anyhow::Result;
-use semantic_router::{cache, config, embeddings, proxy, routing, server};
+use semantic_router::{cache, config, embeddings, proxy, routing, server, telemetry};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+    // Kept alive for the process lifetime: dropping it would shut down the
+    // batch span processor's background export task.
+    let _tracer_provider = telemetry::init();
 
     let config_path = std::env::var("ROUTER_CONFIG").unwrap_or_else(|_| "config/routes.yaml".to_string());
     let cfg = config::Config::load(&config_path)?;
@@ -37,7 +36,16 @@ async fn main() -> Result<()> {
         );
     }
 
-    let semantic_router = routing::SemanticRouter::new(category_indexes, cfg.routing.confidence_threshold);
+    let similarity_router = routing::SemanticRouter::new(category_indexes, cfg.routing.confidence_threshold);
+
+    let routing_strategy = match cfg.routing.strategy {
+        config::RoutingStrategyKind::Similarity => routing::RoutingStrategy::Similarity(similarity_router),
+        config::RoutingStrategyKind::Classifier => {
+            let classifier = semantic_router::classifier::Classifier::load(&cfg.routing.classifier_path)?;
+            tracing::info!(path = %cfg.routing.classifier_path, "loaded trained routing classifier");
+            routing::RoutingStrategy::Classifier { classifier, confidence_threshold: cfg.routing.confidence_threshold }
+        }
+    };
 
     let default_backend = proxy::BackendTarget {
         base_url: cfg.default.base_url.clone(),
@@ -56,7 +64,7 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(server::AppState {
         embedder: Arc::new(embedder),
-        router: Arc::new(semantic_router),
+        router: Arc::new(routing_strategy),
         backends,
         default_backend,
         default_backend_name: cfg.default.name.clone(),

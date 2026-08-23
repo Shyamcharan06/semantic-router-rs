@@ -14,11 +14,21 @@ services:
       - ROUTER_CONFIG=/app/config/routes.yaml
       - HF_HUB_CACHE=/app/.cache/huggingface
       - RUST_LOG=info
+      # Full request-pipeline traces (prompt guard, PII, embed, cache,
+      # route, backend call) at http://localhost:16686 -- see README.
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     volumes:
       - hf-cache:/app/.cache/huggingface
       - ./config:/app/config:ro
     depends_on:
       - mock-backend
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318"   # OTLP HTTP receiver
 
 volumes:
   hf-cache:

@@ -2,12 +2,13 @@
 
 A "Mixture-of-Models" LLM router, written in Rust: it reads an incoming chat
 prompt, figures out what kind of task it is (coding, math, creative writing,
-business/legal, general chat) using local embedding similarity, and forwards
-the request to whichever backend model handles that category best — all
-without a training step, an ONNX runtime, or a Python inference dependency.
-It also does the original project's other two headline tricks: it can
-redact/block PII and jailbreak attempts before they reach a backend, and it
-can cache near-duplicate prompts to skip the backend entirely.
+business/legal, general chat), and forwards the request to whichever backend
+model handles that category best. Two routing strategies ship side by side —
+zero-training embedding similarity, and a trained linear classifier that
+beat it in measurement (94% vs. 88% held-out accuracy, see below) — plus PII
+redaction/blocking, jailbreak detection, a semantic cache, SSE streaming
+passthrough, and OpenTelemetry tracing across the whole pipeline. All of it
+runs as one Rust binary; no Python, ONNX runtime, or GPU at inference time.
 
 Inspired by [vllm-project/semantic-router](https://github.com/vllm-project/semantic-router).
 This is a much smaller, from-scratch project built around the same core idea
@@ -29,7 +30,7 @@ flowchart LR
     STREAM -- no --> C{Semantic cache\nhit?}
     C -- yes --> H[Return cached response]
     C -- no --> D
-    STREAM -- yes --> D[Cosine similarity vs.\nper-category examples]
+    STREAM -- yes --> D[Route: similarity or\ntrained classifier]
     D --> E{Best score >=\nthreshold?}
     E -- yes --> F[Route to category's backend]
     E -- no --> G[Route to default backend]
@@ -47,10 +48,11 @@ flowchart LR
 2. Each incoming request is optionally screened by the **prompt guard**
    (blocks known jailbreak phrases) and **PII detector** (blocks or redacts
    emails/phone numbers/SSNs/card numbers/IPs) before anything else happens.
-3. The (possibly redacted) latest user message is embedded and compared by
-   cosine similarity against every category's examples. The
-   highest-scoring category above `confidence_threshold` wins; otherwise the
-   request falls back to a configured default backend.
+3. The (possibly redacted) latest user message is embedded, then routed by
+   whichever strategy `routing.strategy` selects: cosine similarity against
+   every category's examples, or a trained linear classifier over the same
+   embedding. The winning category above `confidence_threshold` wins;
+   otherwise the request falls back to a configured default backend.
 4. Non-streaming requests check a brute-force **semantic cache** first,
    short-circuiting near-duplicate prompts before they reach a backend.
 5. The request is proxied to that category's backend (`model` field
@@ -70,20 +72,27 @@ library. No Python, no ONNX Runtime, no GPU required.
 router/                  Rust service (axum + Candle)
   src/
     embeddings.rs          Candle MiniLM loading + sentence embedding
-    routing.rs              cosine similarity + category selection
-    cache.rs                 semantic response cache
-    pii.rs                    regex-based PII scan/redact
-    prompt_guard.rs            jailbreak phrase detection
-    proxy.rs                    forwards requests to the routed backend,
-                                  including SSE streaming passthrough
-    server.rs                    axum HTTP layer + security checks
-    config.rs                     routes.yaml schema/loader
+    routing.rs              similarity router + RoutingStrategy enum
+    classifier.rs             trained linear-probe inference
+    cache.rs                    semantic response cache
+    pii.rs                       regex-based PII scan/redact
+    prompt_guard.rs                jailbreak phrase detection
+    proxy.rs                        forwards requests to the routed backend,
+                                      including SSE streaming passthrough
+    server.rs                        axum HTTP layer, security checks,
+                                       per-stage tracing spans
+    config.rs                          routes.yaml schema/loader
+    telemetry.rs                        console logging + optional OTLP
+                                          trace export
   tests/integration_test.rs  end-to-end tests against a mock backend:
-                               routing, PII block/redact, prompt guard,
-                               streaming
-config/routes.example.yaml  category definitions, backend targets, security
+                               both routing strategies, PII block/redact,
+                               prompt guard, streaming
+config/
+  routes.example.yaml     category definitions, backend targets, security
+  classifier.json           trained weights (eval/train_classifier.py)
 deploy/k8s/               Deployment/Service/Kustomization for a cluster
-eval/                     Python: labeled dataset + accuracy harness
+eval/                     Python: labeled dataset, accuracy harness,
+                           classifier trainer, mock backend
 ```
 
 ## Quickstart
@@ -131,10 +140,11 @@ mock backend running:
 .venv/bin/python eval/run_eval.py --router-url http://localhost:8088
 ```
 
-**Current result: 88% accuracy** (88/100) using pure embedding-similarity
-routing with `all-MiniLM-L6-v2` and 12 example utterances per category — no
-fine-tuning, no training data beyond the example sentences in
-`routes.yaml`.
+### Similarity routing (`routing.strategy: similarity`, the default)
+
+**88% accuracy** (88/100) using pure embedding-similarity routing with
+`all-MiniLM-L6-v2` and 12 example utterances per category — no training
+data beyond the example sentences already in `routes.yaml`.
 
 | Category | Precision | Recall | F1 |
 |---|---|---|---|
@@ -144,12 +154,54 @@ fine-tuning, no training data beyond the example sentences in
 | general_chat | 0.86 | 0.90 | 0.88 |
 | math_reasoning | 0.82 | 0.90 | 0.86 |
 
-Most of the remaining misses are genuinely ambiguous prompts that read as
-belonging to more than one category ("What's the chi-squared test used
-for?" landing in business_legal instead of math_reasoning). Doubling the
-category example set from 6 to 12 utterances took accuracy from 71% to 88%
-on this same held-out set — the biggest lever if you want to push further
-is adding more/better examples in `routes.yaml`, not the model.
+Doubling the category example set from 6 to 12 utterances took accuracy
+from 71% to 88% on this same held-out set — the biggest lever for this
+strategy is adding more/better examples in `routes.yaml`, not the model.
+
+### Trained classifier (`routing.strategy: classifier`)
+
+`eval/train_classifier.py` trains a logistic-regression probe on the exact
+same 60 example sentences (12 × 5 categories) similarity routing uses —
+calling the router's own `/embed` endpoint so there's only one embedding
+implementation in the whole project, never a second copy re-derived in
+Python. Getting this to work well took two real fixes, worth keeping for
+the story:
+
+1. **First attempt: 7% accuracy** (worse than random). 60 examples in 384
+   dimensions is badly underdetermined; `LogisticRegression`'s default
+   regularization (`C=1.0`) fits the training set perfectly (100% train
+   accuracy) but is nearly random on anything it hasn't seen. Switched to
+   `LogisticRegressionCV` (5-fold CV *within the training examples*, never
+   touching the held-out eval set) to pick the regularization strength
+   properly — **63% accuracy**, and every remaining miss was the classifier
+   correctly declining to guess (100% precision on every real category, just
+   low recall from an over-conservative `confidence_threshold: 0.35`
+   carried over from similarity routing's cosine-similarity scale).
+2. Since the failure mode was purely "under-confident, never wrong,"
+   lowering `confidence_threshold` to `0.25` (still comfortably above the
+   1-in-5 = 0.20 random baseline) was the obvious next move: **94%
+   accuracy**, beating similarity routing.
+
+| Category | Precision | Recall | F1 |
+|---|---|---|---|
+| business_legal | 1.00 | 0.95 | 0.97 |
+| coding | 1.00 | 0.85 | 0.92 |
+| creative_writing | 0.90 | 0.95 | 0.93 |
+| general_chat | 0.95 | 0.95 | 0.95 |
+| math_reasoning | 1.00 | 1.00 | 1.00 |
+
+The trained `config/classifier.json` is committed, so `routing.strategy:
+classifier` works immediately without retraining — but it's specific to the
+category set it was trained on. If you edit `categories` in `routes.yaml`,
+retrain before switching to classifier mode:
+
+```bash
+.venv/bin/python eval/train_classifier.py --router-url http://localhost:8088
+```
+
+Similarity routing stays the default despite the lower score: it adapts to
+config changes for free, with no separate training/export step and no risk
+of a stale model silently mismatching the current category list.
 
 ## Security: PII redaction and prompt guard
 
@@ -189,19 +241,43 @@ straight through as it arrives (no buffering, no JSON re-serialization) —
 routing decision headers (`x-router-category` etc.) are still attached, and
 whatever `content-type` the backend sent is passed through as-is.
 
+## Observability: OpenTelemetry tracing
+
+Structured console logging (`RUST_LOG=info`, `tracing_subscriber`) always
+works. Set `OTEL_EXPORTER_OTLP_ENDPOINT` and the router additionally exports
+spans over OTLP/HTTP — every request becomes one trace with per-stage
+timing (`tower_http::trace::TraceLayer` for the HTTP-level span, then
+nested `prompt_guard` / `pii_scan` / `embed` / `cache_lookup` / `route` /
+`proxy_backend_call` spans inside it), matching the original project's
+"fine-grained visibility into the request processing pipeline" feature.
+It's best-effort: an unreachable collector logs a warning at startup and
+the router runs exactly as normal, tracing just doesn't leave the process.
+
+```bash
+docker compose up --build   # now also starts Jaeger
+```
+
+Then open **http://localhost:16686**, pick the `semantic-router` service,
+and look at a trace for any request you've sent — the security/embed/cache/
+route/backend breakdown is right there per-span. Outside Docker: run
+`docker run -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest`
+and `export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` before
+`cargo run`.
+
 ## Testing
 
 ```bash
 cargo test
 ```
 
-Runs unit tests (cosine similarity, category selection, cache eviction,
-request parsing, PII regexes, prompt-guard matching — 25 of them) plus 6
-integration tests that spin up a real Candle/MiniLM embedder and a mock
-backend and assert, end-to-end over real HTTP: correct category routing,
-prompt-guard blocking, PII block mode, PII redact mode (verifying the
-*backend* actually received the scrubbed text), and SSE streaming
-passthrough.
+29 unit tests (cosine similarity, category selection, cache eviction,
+request parsing, PII regexes, prompt-guard matching, classifier math) plus
+7 integration tests that spin up a real Candle/MiniLM embedder and a mock
+backend and assert, end-to-end over real HTTP: correct category routing
+under *both* routing strategies (including against the actual committed
+`classifier.json`, so a stale/broken weights file fails CI-style), prompt-
+guard blocking, PII block mode, PII redact mode (verifying the *backend*
+actually received the scrubbed text), and SSE streaming passthrough.
 
 ## Deploying to Kubernetes
 
@@ -217,23 +293,26 @@ kubectl apply -k deploy/k8s
 
 Point the `kustomization.yaml`'s `configMapGenerator` at your own
 `routes.yaml` (with real backends, not the mock) before deploying anywhere
-that isn't a demo.
+that isn't a demo. Set `OTEL_EXPORTER_OTLP_ENDPOINT` on the container if
+your cluster already runs an OTLP collector.
 
 ## What's here vs. what's not
 
-This implements the core routing idea end-to-end and working: embedding
-similarity routing, an OpenAI-compatible proxy with streaming passthrough,
-a semantic cache, heuristic PII/prompt-guard security, a Kubernetes
-deployment, and a measured accuracy number. It does **not** implement the
-original project's harder ML infrastructure:
+This implements the core routing idea end-to-end and working, both ways:
+zero-training embedding similarity *and* a trained linear classifier that
+beats it, an OpenAI-compatible proxy with streaming passthrough, a semantic
+cache, heuristic PII/prompt-guard security, OpenTelemetry tracing, a
+Kubernetes deployment, and measured accuracy numbers for both routing
+strategies. It does **not** implement the original project's remaining,
+harder infrastructure:
 
-- A trained BERT classifier in place of max-similarity routing (the
-  biggest remaining gap — would need labeled training data and an export
-  pipeline)
+- A full transformer classifier (fine-tuned BERT) in place of the linear
+  probe here — the linear probe already outperforms similarity routing on
+  this task, but a fine-tuned model would likely generalize further past
+  60 training examples
 - Production-grade PII/NER detection in place of the regex heuristics here
 - An HNSW (or similar) index if the category/example count grows large
   enough that brute-force cosine search stops being fast enough
-- Distributed tracing / OpenTelemetry across the request pipeline
 
 ## License
 

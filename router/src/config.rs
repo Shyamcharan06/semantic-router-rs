@@ -35,20 +35,37 @@ fn default_revision() -> String {
     "main".to_string()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingStrategyKind {
+    #[default]
+    Similarity,
+    Classifier,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RoutingConfig {
     #[serde(default = "default_threshold")]
     pub confidence_threshold: f32,
+    #[serde(default)]
+    pub strategy: RoutingStrategyKind,
+    /// Only read when `strategy: classifier`. See eval/train_classifier.py.
+    #[serde(default = "default_classifier_path")]
+    pub classifier_path: String,
 }
 
 impl Default for RoutingConfig {
     fn default() -> Self {
-        Self { confidence_threshold: default_threshold() }
+        Self { confidence_threshold: default_threshold(), strategy: RoutingStrategyKind::default(), classifier_path: default_classifier_path() }
     }
 }
 
 fn default_threshold() -> f32 {
     0.35
+}
+
+fn default_classifier_path() -> String {
+    "config/classifier.json".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
