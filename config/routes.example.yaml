@@ -1,0 +1,131 @@
+# Semantic Router configuration.
+#
+# Copy this file to routes.yaml (or point ROUTER_CONFIG at a copy) and adjust
+# base_url / api_key_env / model for whatever OpenAI-compatible backends you
+# actually have available (OpenAI, a local Ollama server, another gateway,
+# or -- for local development -- eval/mock_backend.py).
+
+server:
+  host: 0.0.0.0
+  # Note: on some Windows machines, low-numbered ports like 8080 can be
+  # blocked by Hyper-V's reserved port ranges or antivirus/VPN software,
+  # producing "os error 10013" on bind. 8088 avoided that here; if it still
+  # happens for you, just pick another free port.
+  port: 8088
+
+embedding:
+  model_id: sentence-transformers/all-MiniLM-L6-v2
+  revision: main
+
+routing:
+  # Minimum cosine similarity required to route to a category. Below this,
+  # the request falls back to `default`.
+  confidence_threshold: 0.35
+
+cache:
+  enabled: true
+  similarity_threshold: 0.92
+  ttl_seconds: 300
+  max_entries: 1000
+
+default:
+  name: default
+  base_url: http://localhost:9000
+  api_key_env: MOCK_API_KEY
+  model: general-chat-model
+
+categories:
+  - name: coding
+    backend:
+      base_url: http://localhost:9000
+      api_key_env: MOCK_API_KEY
+      model: coder-model
+    examples:
+      - "Write a Python function to reverse a linked list"
+      - "Why is my Rust borrow checker complaining about this code?"
+      - "Debug this JavaScript async function that isn't awaiting properly"
+      - "Explain the time complexity of quicksort"
+      - "How do I set up a REST API with FastAPI?"
+      - "What's the difference between a Vec and a slice in Rust?"
+      - "How do I resolve a git merge conflict?"
+      - "What's a good way to design a scalable backend system?"
+      - "How do I configure a Python virtual environment for a new project?"
+      - "Explain how database indexing improves query performance"
+      - "Why does my code throw a null pointer exception?"
+      - "How do I containerize an application with Docker?"
+
+  - name: math_reasoning
+    backend:
+      base_url: http://localhost:9000
+      api_key_env: MOCK_API_KEY
+      model: math-model
+    examples:
+      - "Solve for x: 2x^2 + 5x - 3 = 0"
+      - "Prove that the square root of 2 is irrational"
+      - "What is the derivative of sin(x) times e^x?"
+      - "A train leaves station A at 60mph, another leaves station B at 80mph, when do they meet?"
+      - "Explain Bayes' theorem with a concrete example"
+      - "What's the probability of rolling three sixes in a row with a fair die?"
+      - "How do you calculate compound interest over 10 years?"
+      - "Explain how gradient descent finds a minimum"
+      - "What's the difference between permutations and combinations?"
+      - "Prove the Pythagorean theorem"
+      - "How many arrangements are possible for 5 distinct items?"
+      - "Explain what an eigenvalue represents geometrically"
+
+  - name: creative_writing
+    backend:
+      base_url: http://localhost:9000
+      api_key_env: MOCK_API_KEY
+      model: creative-model
+    examples:
+      - "Write a short story about a lighthouse keeper who finds a message in a bottle"
+      - "Compose a poem about autumn leaves falling"
+      - "Give me a plot twist for a mystery novel"
+      - "Write dialogue between two old friends reuniting after 20 years"
+      - "Brainstorm fantasy world-building ideas for a novel"
+      - "Write song lyrics about missing someone"
+      - "Describe a bustling marketplace in vivid, sensory detail"
+      - "Write an opening line that hooks the reader immediately"
+      - "Invent a backstory for a mysterious side character"
+      - "Write a scene where the protagonist faces their greatest fear"
+      - "Compose a limerick about a clumsy knight"
+      - "Write a monologue revealing a character's hidden motive"
+
+  - name: business_legal
+    backend:
+      base_url: http://localhost:9000
+      api_key_env: MOCK_API_KEY
+      model: business-model
+    examples:
+      - "Draft a non-disclosure agreement for a software contractor"
+      - "What are the key clauses in a SaaS terms of service?"
+      - "Help me write a business plan executive summary"
+      - "Explain the difference between an LLC and an S-corp"
+      - "Summarize the key points of GDPR compliance for a startup"
+      - "Write a professional email declining a vendor's proposal"
+      - "What should a founders' equity split agreement cover?"
+      - "Explain what due diligence involves during an acquisition"
+      - "Draft a freelance contract with clear payment terms"
+      - "What are the fiduciary responsibilities of a company board member?"
+      - "Explain how vesting schedules work for startup equity"
+      - "What's required to legally register a trademark?"
+
+  - name: general_chat
+    backend:
+      base_url: http://localhost:9000
+      api_key_env: MOCK_API_KEY
+      model: general-chat-model
+    examples:
+      - "What's a good recipe for chicken curry?"
+      - "Recommend some books similar to Dune"
+      - "What's the weather usually like in Seattle in October?"
+      - "Give me tips for a road trip along the California coast"
+      - "What's a fun fact about octopuses?"
+      - "How do I train for a 10k race as a beginner?"
+      - "Recommend a relaxing weekend activity"
+      - "Suggest some good podcasts to listen to while commuting"
+      - "What are some tips for getting better sleep?"
+      - "Recommend a fun board game for a family game night"
+      - "What's a good icebreaker question for a team meeting?"
+      - "Suggest some low-maintenance houseplants for a beginner"

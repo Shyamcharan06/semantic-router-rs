@@ -1,0 +1,100 @@
+{"prompt": "How do I implement a binary search in Go?", "category": "coding"}
+{"prompt": "What's causing this segmentation fault in my C program?", "category": "coding"}
+{"prompt": "Convert this SQL query to use a JOIN instead of a subquery", "category": "coding"}
+{"prompt": "Explain the difference between == and === in JavaScript", "category": "coding"}
+{"prompt": "Write a regex to validate email addresses", "category": "coding"}
+{"prompt": "How do I set up GitHub Actions for CI on a Python project?", "category": "coding"}
+{"prompt": "What's the best way to handle null pointer exceptions in Java?", "category": "coding"}
+{"prompt": "Refactor this function to use list comprehension in Python", "category": "coding"}
+{"prompt": "How do async/await work under the hood in JavaScript?", "category": "coding"}
+{"prompt": "Write a Dockerfile for a Node.js application", "category": "coding"}
+{"prompt": "Explain the SOLID principles with examples", "category": "coding"}
+{"prompt": "How do I fix a merge conflict in git?", "category": "coding"}
+{"prompt": "What's the difference between a mutex and a semaphore?", "category": "coding"}
+{"prompt": "Write unit tests for this React component", "category": "coding"}
+{"prompt": "How do I optimize this SQL query that's running slowly?", "category": "coding"}
+{"prompt": "Explain how garbage collection works in the JVM", "category": "coding"}
+{"prompt": "Write a function to detect a cycle in a linked list", "category": "coding"}
+{"prompt": "How do I set up a virtual environment in Python?", "category": "coding"}
+{"prompt": "What's a good way to structure a microservices architecture?", "category": "coding"}
+{"prompt": "Debug why my React state isn't updating", "category": "coding"}
+{"prompt": "What is the integral of x^2 from 0 to 3?", "category": "math_reasoning"}
+{"prompt": "Explain the Central Limit Theorem", "category": "math_reasoning"}
+{"prompt": "Solve this system of linear equations: 3x + y = 7, x - y = 1", "category": "math_reasoning"}
+{"prompt": "What's the eigenvalue of a 2x2 identity matrix?", "category": "math_reasoning"}
+{"prompt": "Prove the Pythagorean theorem", "category": "math_reasoning"}
+{"prompt": "Calculate the standard deviation of this dataset: 2, 4, 4, 4, 5, 5, 7, 9", "category": "math_reasoning"}
+{"prompt": "What's the difference between permutations and combinations?", "category": "math_reasoning"}
+{"prompt": "Explain what a Markov chain is", "category": "math_reasoning"}
+{"prompt": "How do you find the greatest common divisor of two numbers?", "category": "math_reasoning"}
+{"prompt": "What is the limit of (1 + 1/n)^n as n approaches infinity?", "category": "math_reasoning"}
+{"prompt": "Explain conditional probability with an example", "category": "math_reasoning"}
+{"prompt": "How many ways can you arrange 5 books on a shelf?", "category": "math_reasoning"}
+{"prompt": "What's the formula for compound interest?", "category": "math_reasoning"}
+{"prompt": "Explain the difference between correlation and causation", "category": "math_reasoning"}
+{"prompt": "Solve for the roots of x^3 - 6x^2 + 11x - 6", "category": "math_reasoning"}
+{"prompt": "What is a Taylor series expansion?", "category": "math_reasoning"}
+{"prompt": "Explain how gradient descent minimizes a loss function", "category": "math_reasoning"}
+{"prompt": "What's the chi-squared test used for?", "category": "math_reasoning"}
+{"prompt": "Calculate the area under a normal distribution curve between -1 and 1 standard deviation", "category": "math_reasoning"}
+{"prompt": "Explain matrix multiplication with a 3x3 example", "category": "math_reasoning"}
+{"prompt": "Write an opening line for a horror novel set in an abandoned hospital", "category": "creative_writing"}
+{"prompt": "Create a character backstory for a reluctant hero", "category": "creative_writing"}
+{"prompt": "Write a haiku about the ocean at dawn", "category": "creative_writing"}
+{"prompt": "Continue this story: The door creaked open, revealing...", "category": "creative_writing"}
+{"prompt": "Write a breakup letter from the perspective of a robot", "category": "creative_writing"}
+{"prompt": "Invent a mythology for a floating city in the clouds", "category": "creative_writing"}
+{"prompt": "Write a scene where two rivals reluctantly team up", "category": "creative_writing"}
+{"prompt": "Compose song lyrics about starting over", "category": "creative_writing"}
+{"prompt": "Write a monologue for a villain explaining their motives", "category": "creative_writing"}
+{"prompt": "Describe a bustling marketplace in a fantasy world", "category": "creative_writing"}
+{"prompt": "Write a twist ending for a heist story", "category": "creative_writing"}
+{"prompt": "Create a dialogue between a ghost and the new tenant of their house", "category": "creative_writing"}
+{"prompt": "Write a limerick about a clumsy wizard", "category": "creative_writing"}
+{"prompt": "Describe the feeling of first snowfall from a child's perspective", "category": "creative_writing"}
+{"prompt": "Write an opening chapter for a sci-fi novel about first contact", "category": "creative_writing"}
+{"prompt": "Create a bedtime story about a dragon afraid of fire", "category": "creative_writing"}
+{"prompt": "Write a eulogy for a beloved fictional pet", "category": "creative_writing"}
+{"prompt": "Invent a folk tale explaining why the moon changes shape", "category": "creative_writing"}
+{"prompt": "Write a letter from a time traveler to their past self", "category": "creative_writing"}
+{"prompt": "Describe an underwater city in vivid detail", "category": "creative_writing"}
+{"prompt": "What should be included in a founders' agreement?", "category": "business_legal"}
+{"prompt": "Explain the difference between a trademark and a copyright", "category": "business_legal"}
+{"prompt": "Draft a return policy for an e-commerce store", "category": "business_legal"}
+{"prompt": "What are the tax implications of an LLC vs a sole proprietorship?", "category": "business_legal"}
+{"prompt": "Write a cease and desist letter template", "category": "business_legal"}
+{"prompt": "Explain what due diligence means in an acquisition", "category": "business_legal"}
+{"prompt": "What clauses should a freelance contract include?", "category": "business_legal"}
+{"prompt": "Summarize the key requirements of the CCPA", "category": "business_legal"}
+{"prompt": "Draft a privacy policy for a mobile app", "category": "business_legal"}
+{"prompt": "Explain vesting schedules for startup equity", "category": "business_legal"}
+{"prompt": "What's the difference between a merger and an acquisition?", "category": "business_legal"}
+{"prompt": "Write a shareholder agreement outline", "category": "business_legal"}
+{"prompt": "Explain what a fiduciary duty means for a board member", "category": "business_legal"}
+{"prompt": "Draft an employee non-compete clause", "category": "business_legal"}
+{"prompt": "What's involved in filing for a trademark?", "category": "business_legal"}
+{"prompt": "Explain the basics of antitrust law for startups", "category": "business_legal"}
+{"prompt": "Write a partnership dissolution agreement summary", "category": "business_legal"}
+{"prompt": "What are the SEC disclosure requirements for a startup raising a Series A?", "category": "business_legal"}
+{"prompt": "Draft a vendor SLA for a SaaS product", "category": "business_legal"}
+{"prompt": "Explain at-will employment and its exceptions", "category": "business_legal"}
+{"prompt": "What are some good hiking trails near Denver?", "category": "general_chat"}
+{"prompt": "Recommend a beginner-friendly board game for a family game night", "category": "general_chat"}
+{"prompt": "What's a healthy breakfast that's quick to make?", "category": "general_chat"}
+{"prompt": "Suggest a workout routine for someone who just joined a gym", "category": "general_chat"}
+{"prompt": "What are some tips for improving sleep quality?", "category": "general_chat"}
+{"prompt": "Recommend a podcast about history", "category": "general_chat"}
+{"prompt": "What's a good gift for someone who loves gardening?", "category": "general_chat"}
+{"prompt": "How do I get red wine stains out of a carpet?", "category": "general_chat"}
+{"prompt": "What are some fun icebreaker questions for a team meeting?", "category": "general_chat"}
+{"prompt": "Suggest a weekend itinerary for visiting Kyoto", "category": "general_chat"}
+{"prompt": "What's the difference between green tea and black tea?", "category": "general_chat"}
+{"prompt": "Recommend some comfort food recipes for a rainy day", "category": "general_chat"}
+{"prompt": "What are some tips for photographing the night sky?", "category": "general_chat"}
+{"prompt": "How do I train my puppy to stop biting?", "category": "general_chat"}
+{"prompt": "Suggest a playlist for a road trip", "category": "general_chat"}
+{"prompt": "What's a good way to start meditating as a beginner?", "category": "general_chat"}
+{"prompt": "Recommend a cozy mystery book series", "category": "general_chat"}
+{"prompt": "What are some low-maintenance houseplants for beginners?", "category": "general_chat"}
+{"prompt": "Suggest some team-building activities for a small office", "category": "general_chat"}
+{"prompt": "What's a fun fact about the deep ocean?", "category": "general_chat"}

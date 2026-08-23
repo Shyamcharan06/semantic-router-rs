@@ -1,0 +1,8 @@
+/target
+config/routes.yaml
+.env
+
+__pycache__/
+*.pyc
+.venv/
+venv/
